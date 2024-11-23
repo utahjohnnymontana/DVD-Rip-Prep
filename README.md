@@ -89,10 +89,10 @@ containing your MKV files and run drp -d.
 The script can also handle progressive conversions for all but the mixed
 methods case.  It can do the following pretty reliably:
 
-* Convert 30FPS soft telecined video to 24FPS progressive video
-* Convert 30FPS hard telecined video to 24FPS progressive video
-* Convert 30FPS interlaced video to 30FPS progressive video
-* Convert 25FPS PAL (interlaced or progressive) to 24FPS progressive video
+* Convert 30FPS soft telecined video to 24FPS progressive video  
+* Convert 30FPS hard telecined video to 24FPS progressive video  
+* Convert 30FPS interlaced video to 30FPS progressive video  
+* Convert 25FPS PAL (interlaced or progressive) to 24FPS progressive video  
 
 These conversions should give you a file with a consistent frame rate and no
 introduced stutters that can be processed in TVAI without resorting to an 
