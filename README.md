@@ -182,10 +182,10 @@ primarily there so that you can check it and make sure that the audio still
 syncs.
 
 You can run:
-drp					| batch mode  
+drp					  | batch mode  
 drp -d				| dry run batch mode  
-drp <file>			| single file  
-drp -d <file>		| single file dry run  
+drp file			| single file  
+drp -d file		| single file dry run  
 
 There are settings at the top of the script file that you can change.  They 
 are explained in the comments.
