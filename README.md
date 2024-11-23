@@ -1,8 +1,7 @@
 DVD Rip Prep (drp) is a bash script that attemps to prepare an MKV file produced
-from a DVD by MakeMKV and prepare it for upscaling.  It will probably not be of 
-any use with other video files.  It won't do you much good with video extracted
-from a Blu Ray or 4K or even with files that were extracted from a DVD but later
-edited.
+from a DVD by MakeMKV for upscaling.  It will probably not be of any use with 
+other video files.  It won't do you much good with video extracted from a Blu Ray 
+or 4K or even with files that were extracted from a DVD but later edited.
 
 Before you read further, this is a hobby project.  I am not a video professional
 and this is as much a learning project for me as anything.  I don't really know
