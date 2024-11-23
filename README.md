@@ -120,10 +120,10 @@ directory.  Scan through the video and look for places where titles, credits,
 or computer graphics were added.  Get the start and end times for each such 
 segment and add them to the times file in this format:
 
-start,00:02:00
-00:02:00,00:04:00
-00:04:00,00:48:00
-00:48:00,end
+start,00:02:00  
+00:02:00,00:04:00  
+00:04:00,00:48:00  
+00:48:00,end  
 
 This is an example of a very common pattern in TV shows that have overlayed 
 titles and credits but no CGI effects.  This would look like a two minute 
