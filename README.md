@@ -175,7 +175,7 @@ with the linux subsystem) and ffmpeg, mediainfo, and mkvtoolnix must be
 installed.
 
 This is way more complicated than it was originally, has overall poor error 
-handling, and not much in the way of sanity checking, so it is pertty fragile.  
+handling, and not much in the way of sanity checking, so it is pretty fragile.  
 If you give it anything unexpected, it is likely to break in a fairly ugly 
 fashion.  Don't expect too much.  Any kind of feedback is welcome.  I will do 
 my best to fix problems, but this is just a little hobby project for me, so it 
