@@ -114,8 +114,8 @@ methods case.  It can do the following pretty reliably:
 * Convert 30FPS interlaced video to 30FPS progressive video  
 * Convert 25FPS PAL (interlaced or progressive) to 24FPS progressive video  
 
-These conversions should give you a file with a consistent frame rate and no
-introduced stutters that can be processed in TVAI without resorting to an 
+These conversions should give you a file with a consistent frame rate, and no
+introduced stutters, that can be processed in TVAI without resorting to an 
 interlaced method.
 
 There is another feature that is still in progress, but works in many cases:
