@@ -41,11 +41,42 @@ extract the progressive frames and move ahead.  In hard telecine, the video
 is stored in telecined format, so the interlaced frames actually exist on the
 disk and the player just reads them off like anything else.  To remove hard
 telecine, you need to recombine those interlaced pairs, hopefully without
-altering anything else.
+altering anything else.  This process is known as inverse telecine.
+
+You will find these techniques used in different places.  Almost all North
+American DVDs of movies are either soft or hard telecined and that's it.
+European DVDs of movies are usually just progressive content played at the
+slightly faster 25 FPS.  You can just slow it down to 24 FPS and the job is
+done.  TV is where it gets complicated.  TV made before the 1980s tends to
+be just like film, either soft or hard telecined.  TV made after about 2005
+tends to be soft telecined.  It is those years in between that are a real
+problem.  From around 1980 to 2005, video was often shot on one format and
+edited on another.  The original bits and the edited bits were then spliced
+back together.  Often, this will result in combinations of soft telecine
+and hard telecine or even full interlacing.  This is really hard to deal
+with automatically.  If you inverse telecine soft telecined frames, then you
+drop 20% of the frames.  If you deinterlace telecined content, then you make
+the interlaced frames progressive and turn the original 24 FPS video into
+30 FPS with a stutter.  So, when the techniques are mixed in a video, if you
+apply a single method to reverse them, you will fix some of the video but 
+break the rest.
 
 So, the first function of drp is to look at MKVs and decide if they are soft
 telecined, hard telecined, interlaced, or some horrifying combination of 
 these techniques (which is, unfortunately, common).  Originally, this was my
 only goal for the script.  I wanted something that would analyze the videos
 and give me a report so that I could then apply the appropriate techniques to
-recover fully progressive video for upscaling.
+recover fully progressive video for upscaling.  As these things tend to go, I
+then wondered if I could make the script actually do all of the work and fix
+the video.
+
+As it stands, drp can do these things pretty well:
+
+* Convert 30FPS soft telecined video to 24FPS progressive video
+* Convert 30FPS hard telecined video to 24FPS progressive video
+* Convert 30FPS interlaced video to 30FPS progressive video
+* Convert 25FPS PAL (interlaced or progressive) to 24FPS progressive video
+
+These conversions should give you a file with a consistent frame rate and no
+introduced stutters that can be processed in TVAI without resorting to an 
+interlaced method.
