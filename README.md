@@ -149,3 +149,34 @@ can do a lot with it.  If enough people use this, I can imagine them swapping
 their times files so that others don't have to start from scratch.  Of course,
 maybe I will find an automatic solution soon enough to make that unnecessary.  
 Only time will tell.
+
+The script now creates a temp directory named 00DRP that contains log files 
+and subdirectories for the output of all the intermediate steps.  If you find 
+that a video didn't complete, check the log files and you are bound to discover 
+that one of the segments needs adjustment.
+
+By default, the final output of the script will be both a "rejoined" MKV that 
+contains only the video and a "merged" MKV that add the source MKV file back in.  
+You should use the rejoined file for your TVAI upscaling.  The merged file is 
+primarily there so that you can check it and make sure that the audio still 
+syncs.
+
+You can run:
+drp					| batch mode  
+drp -d				| dry run batch mode  
+drp <file>			| single file  
+drp -d <file>		| single file dry run  
+
+There are settings at the top of the script file that you can change.  They 
+are explained in the comments.
+
+The script requires a system that runs a bash shell (linux/unix/mac or Windows 
+with the linux subsystem) and ffmpeg, mediainfo, and mkvtoolnix must be 
+installed.
+
+This is way more complicated than it was originally, has overall poor error 
+handling, and not much in the way of sanity checking, so it is pertty fragile.  
+If you give it anything unexpected, it is likely to break in a fairly ugly 
+fashion.  Don't expect too much.  Any kind of feedback is welcome.  I will do 
+my best to fix problems, but this is just a little hobby project for me, so it 
+might not happen that fast.
