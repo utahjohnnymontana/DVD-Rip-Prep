@@ -56,7 +56,7 @@ MERGEMKV=1 # Set to 0 to disable merging
 # also output a copy that is merged with the original MKV, which allows you to
 # compare the two video tracks and make sure that the audio syncs up.
 
-OUTDIR=/home/bill/data/2process # Set to your output directory (default is home dir)
+OUTDIR=~ # Set to your output directory (default is home dir)
 TEMPDIR="$OUTDIR/00DRP"
 LOGDIR="$TEMPDIR/LOGS"
 STEP1DIR="$TEMPDIR/STEP1"
