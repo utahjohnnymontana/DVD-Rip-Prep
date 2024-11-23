@@ -69,6 +69,26 @@ the interlaced frames progressive and turn the original 24 FPS video into
 apply a single method to reverse them, you will fix some of the video but 
 break the rest.
 
+Most people who are interested in this script are probably intending to
+upscale video with Topaz Video AI, which is the reason why I wrote it. TVAI 
+can deal with the easy cases itself, as long as you know how to tell it 
+what to do.  TVAI does not recognize soft telecined content, which you can 
+see when you load the video.  It will see the original frame rate as 29.97 
+and will output the same.  So, you are better off reencoding soft telecined 
+videos before importing to TVAI.  TVAI can perform inverse telecine for 
+hard telecined video using the setting found under Input/Edit, but this will 
+wreck anything that isn't actually hard telecined.  And TVAI can deinterlace 
+using the very same function that I use in the script, but the problem is 
+that there are very few instances of movies or TV on DVD that are actually 
+interlaced.  And Topaz has nothing that will deal with the problem of mixed 
+methods in the video.  You might not notice the problems introduced by 
+misapplications of deinterlacing.  TVAI output often looks so much better 
+that it is easy to overlook the small problems that it can introduce.  I had 
+upscaled hundreds of videos before I started to notice stutters and artifacts 
+related to improper deinterlacing.  I spent a lot of time fiddling around with 
+TVAI settings to no great success because the problem was that I was feeding 
+it defective video.
+
 So, the first function of drp is to look at MKVs and decide if they are soft
 telecined, hard telecined, interlaced, or some horrifying combination of 
 these techniques (which is, unfortunately, common).  Originally, this was my
