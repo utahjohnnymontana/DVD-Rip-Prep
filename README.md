@@ -4,6 +4,13 @@ any use with other video files.  It won't do you much good with video extracted
 from a Blu Ray or 4K or even with files that were extracted from a DVD but later
 edited.
 
+Before you read further, this is a hobby project.  I am not a video professional
+and this is as much a learning project for me as anything.  I don't really know
+what I am doing.  The script is just built around ffmpeg and I am probably not 
+even making full use of its capabilities.
+
+Background
+
 To understand why this exists, you need to know a few things about video, DVDs,
 and upscaling.  Until recently, most Movies and TV shows were shot on film, at 
 a frame rate of 24 FPS (actually 23.976025 or 24000/1001).  The rate at which TV
@@ -14,25 +21,26 @@ There are other standards as well.  Screens are now somewhat more flexible than
 in the days of tube TVs, but we still live in a world where the standards were
 set in the past.  The problem here is that the rate at which the video was
 recorded and the rate at which is is displayed are different.  Several methods
-are used to take 24 FPS video and make it play at 30 FPS or 25 FPS.  In North
-America, we used telecine to make 24 FPS content play like 30 FPS.  In Europe,
-since 24 and 25 FPS was so close, they usually just played 24 FPS content at
-25 FPS.  The video and audio play about 4% faster, but nobody really noticed.
+are used to make 24 FPS video play at 30 FPS or 25 FPS.  In North America, we 
+used telecine to make 24 FPS content play like 30 FPS.  In Europe, since 24 
+and 25 FPS are so close, they usually just played 24 FPS content at 25 FPS.  
+The video and audio play about 4% faster, but nobody really noticed.
 
 Telecine is the process of adding 20% more frames to video in order to make it
-play at 30 FPS instead of 24 FPS.  This is done by inserting an extra frame in
-every set of five, but the extra frame is special.  Telecine takes the fourth
-frame and splits it into two interlaced frames.  The original video consisted
-of four progressive frames: PPPP.  The telecined version becomes PPPII.  This
-accomplishes the job of getting the video to play at 30 FPS, but it introduces
-a motion irregularity, because those two interlaced frames are copies of the
-same frame.  This wasn't as noticeable on CRTs, but it is easier to spot on
-modern screens.  We're so used to it that you might never notice, but there is
-a way that you can make it worse and more noticeable and that is by running a
-deinterlace on the telecined video.  That takes the PPPII and turns it into
-PPPPP.  There are now two full, duplicate frames and your display won't be
-aware of it.  The solution is to remove the telecine instead of deinterlacing.
-But, before you can do that, you need to know if your video is telecined.
+play at 30 FPS instead of 24 FPS.  This is done by inserting an extra frame 
+after every set of four, but the extra frame is special.  Telecine takes the 
+fourth frame and splits it into two interlaced frames.  The original video 
+consisted of four progressive frames: PPPP.  The telecined version becomes 
+PPP(II).  This accomplishes the job of getting the video to play at 30 FPS, but 
+it introduces a motion irregularity, because those two interlaced frames are 
+copies of the same image.  This wasn't as noticeable on CRTs, but it is easier 
+to spot on modern screens.  We're so used to it that you might never notice, 
+but there is a way that you can make it worse and more noticeable and that is 
+by running a deinterlace on the telecined video.  That takes the PPP(II) and 
+turns it into PPP(PP).  There are now two full, duplicate frames and your 
+display won't be aware of it.  The solution is to remove the telecine instead 
+of deinterlacing. But, before you can do that, you need to know if your video 
+is telecined.
 
 There are also two forms of telecine: soft and hard.  In soft telecine, the
 video is actually stored as progressive content on the DVD, but the player is
@@ -49,7 +57,7 @@ European DVDs of movies are usually just progressive content played at the
 slightly faster 25 FPS.  You can just slow it down to 24 FPS and the job is
 done.  TV is where it gets complicated.  TV made before the 1980s tends to
 be just like film, either soft or hard telecined.  TV made after about 2005
-tends to be soft telecined.  It is those years in between that are a real
+is usually soft telecined.  It is those years in between that are a real
 problem.  From around 1980 to 2005, video was often shot on one format and
 edited on another.  The original bits and the edited bits were then spliced
 back together.  Often, this will result in combinations of soft telecine
@@ -57,7 +65,7 @@ and hard telecine or even full interlacing.  This is really hard to deal
 with automatically.  If you inverse telecine soft telecined frames, then you
 drop 20% of the frames.  If you deinterlace telecined content, then you make
 the interlaced frames progressive and turn the original 24 FPS video into
-30 FPS with a stutter.  So, when the techniques are mixed in a video, if you
+30 FPS with a stutter.  When the techniques are mixed in a video, if you
 apply a single method to reverse them, you will fix some of the video but 
 break the rest.
 
@@ -70,7 +78,16 @@ recover fully progressive video for upscaling.  As these things tend to go, I
 then wondered if I could make the script actually do all of the work and fix
 the video.
 
-As it stands, drp can do these things pretty well:
+Features
+
+The most basic feature of the script is to diagnose what kind of structure
+a DVD rip has.  You can use the script in dry run mode, which will just
+output a report in the same directory that you run it from that lists the
+diagnosis for each file.  To use this feature, just change to a directory
+containing your MKV files and run drp -d.
+
+The script can also handle progressive conversions for all but the mixed
+methods case.  It can do the following pretty reliably:
 
 * Convert 30FPS soft telecined video to 24FPS progressive video
 * Convert 30FPS hard telecined video to 24FPS progressive video
@@ -80,3 +97,55 @@ As it stands, drp can do these things pretty well:
 These conversions should give you a file with a consistent frame rate and no
 introduced stutters that can be processed in TVAI without resorting to an 
 interlaced method.
+
+There is another feature that is still in progress, but works in many cases:
+
+* Convert mixed video to 24FPS progressive video using a user created
+  segment map.
+
+The previous version of the script had a one pass technique for mixed content 
+and sometimes it even worked, but it was destructive and often resulted in 
+stutters.  I have discontinued that method.
+
+I am working on several approaches for an automatic solution, but I don't 
+even know all of the right questions yet, much less the answers.  Because of 
+that, I have introduced a new process that requires a human to find the 
+segments in the video.  That allows me to move forward without solving the 
+entire problem first.
+
+So, if you have a mixed content video, the script will now look for a segment 
+map file, which is just a series of times in a text file.  If you have a file 
+named my-video.mkv, you will create a file named my-video.times in the same 
+directory.  Scan through the video and look for places where titles, credits, 
+or computer graphics were added.  Get the start and end times for each such 
+segment and add them to the times file in this format:
+
+start,00:02:00
+00:02:00,00:04:00
+00:04:00,00:48:00
+00:48:00,end
+
+This is an example of a very common pattern in TV shows that have overlayed 
+titles and credits but no CGI effects.  This would look like a two minute 
+intro, followed by two minutes of overlayed titles and major credits, followed 
+by the 44 minute body of the episode, followed by the end credits.  You have 
+to account for the full run of the video - no gaps.  Start and end are special 
+times, since the script can get the first and last frame number automatically.  
+You should try to get as close as possible to the time where the segment 
+changes.  If you are lucky, your videos will only have a few segments, but I 
+have tested the script successfully with as many as sixteen.
+
+If you have identified the segments correctly, the script will apply the 
+appropriate technqiue to each segment and output a rejoined video that still 
+syncs up with the audio.  If you got it wrong, then the audio will be out of 
+sync.  That is a sign that you either need to tighten up the segment times or 
+look for an additional segment (maybe a special effects sequence) that you 
+missed.
+
+If this sounds like too much work, I don't blame you.  This is still 
+primitive and slow.  It is a lot less work than trying to do this all manually 
+though.  If you have a good eye for finding the seams in your videos, then you 
+can do a lot with it.  If enough people use this, I can imagine them swapping 
+their times files so that others don't have to start from scratch.  Of course,
+maybe I will find an automatic solution soon enough to make that unnecessary.  
+Only time will tell.
