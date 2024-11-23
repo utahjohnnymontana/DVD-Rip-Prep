@@ -588,9 +588,9 @@ function process {
 	echo "Calculated Frame Rate: $infrate" |tee -a "$logfile"
 	if [ "$(echo "$infrate > 24.95" |bc -l)" -eq 1 ] && [ "$(echo "$infrate < 25.05" |bc -l)" -eq 1 ] && [ "$(echo "$invres > 480" |bc -l)" -eq 1 ]; then
 		nomfrate="25FPS"
-	elif [ "$(echo "$infrate > 23.73" |bc -l)" -eq 1 ] && [ "$(echo "$infrate < 24.21" |bc -l)" -eq 1 ]; then
+	elif [ "$(echo "$infrate > 23.7" |bc -l)" -eq 1 ] && [ "$(echo "$infrate < 24.2" |bc -l)" -eq 1 ]; then
 		nomfrate="24FPS"
-	elif [ "$(echo "$infrate > 29.67" |bc -l)" -eq 1 ] && [ "$(echo "$infrate < 30.27" |bc -l)" -eq 1 ]; then
+	elif [ "$(echo "$infrate > 29.6" |bc -l)" -eq 1 ] && [ "$(echo "$infrate < 30.3" |bc -l)" -eq 1 ]; then
 		nomfrate="30FPS"
 	else
 		nomfrate="Mix"
