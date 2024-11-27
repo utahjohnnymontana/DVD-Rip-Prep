@@ -60,6 +60,8 @@ changes.  If you are lucky, your videos will only have a few segments, but I hav
 
 If you have identified the segments correctly, the script will apply the appropriate technqiue to each segment and output a rejoined video that still syncs up with the audio.  If you got it wrong, then the audio will be out of sync.  That is a sign that you either need to tighten up the segment times or look for an additional segment (maybe a special effects sequence) that you missed.
 
+I'm sure that you are wondering why you would do manual mapping when the script can now (sometimes) do it automatically.  Automatic mapping is really slow.  It is entirely possible that your video is all one mode except for something like a 20 second preview or recap at the beginning of the video.  If you have a whole season of a show that does this, you might be looking at a choice between letting the script grind away for 50 hours or just spending the time to look at each episode and get the transition times.  In some cases, the time might even be the same in each episode.
+
 ##### Automatic Mapping
 
 It is now also possible for the script to automatically generate segment maps.  This is an experimental procedure and it doesn't always work well.  If you have videos with relatively simple structures, like the example above in the Manual Mapping section, then it will probably be faster to make manual maps than to do it automatically.  However, if your video has many small segments, the automatic mapper is likely to do the job faster.
