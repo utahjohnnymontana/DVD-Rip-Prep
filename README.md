@@ -100,11 +100,11 @@ You can run them through bash, like 'bash drp' or 'bash smap', but if you want t
 
 ### Usage
 
-|'drp'|Batch mode - it will try to convert every MKV file in the current directory.|
-|'drp -d'|Dry run batch mode - it will try to diagnose every MKV file and then exit.|
-|'drp file'|Single file mode - it will convert the named file only.|
-|'drp -d file'|Dry run single file - it will diagnose only the name file.|
-|'smap file'|Single file mode - it will create a segment map for the named file.|
+| 'drp' | Batch mode - it will try to convert every MKV file in the current directory. |
+| 'drp -d' | Dry run batch mode - it will try to diagnose every MKV file and then exit. |
+| 'drp file' | Single file mode - it will convert the named file only. |
+| 'drp -d file' | Dry run single file - it will diagnose only the name file. |
+| 'smap file' | Single file mode - it will create a segment map for the named file. |
 
 There are settings at the top of each script file that you can change.  They are explained in the comments.
 
