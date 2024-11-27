@@ -77,7 +77,7 @@ FIXRATE=1
 # a better approach.  2 is always the lossless approach, but 120 FPS videos
 # might not play on everything.
 
-AUTOMAP=1
+AUTOMAP=0
 # If enabled, run the segment mapper in batch mode.  If disabled, you will need
 # to run smap on mixed files manually.  Default is disabled because mapping is
 # a slow and resource intensive process.

@@ -9,7 +9,7 @@
 MINSEG="1"
 # Segments of less than 1 second duration are usually false positives.
 
-USERAMDISK=1
+USERAMDISK=0
 # If enabled, the script will create an 8GB tmpfs memory filesystem.  This will 
 # consume 8GB of RAM for the duration that the script runs, so you probably 
 # wouldn't want to do this on a system that has less than 16GB of RAM.  
