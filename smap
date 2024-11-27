@@ -30,8 +30,14 @@ SEGDIR="$TEMPDIR/segments"
 
 function setup {
 	echo "Setting up directories and cleaning up from previous run."
+	if [ ! -d "$TEMPDIR" ]; then
+		mkdir "$TEMPDIR" || exit 1
+	fi
+	if [ ! -d "$LOGDIR" ]; then
+		mkdir "$LOGDIR" || exit 1
+	fi
 	if [ ! -d "$SEGDIR" ]; then
-		mkdir "$SEGDIR"
+		mkdir "$SEGDIR" || exit 1
 	else
 		cd "$SEGDIR"
 		if [ $(pwd) == "$SEGDIR" ]; then
