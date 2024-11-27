@@ -6,7 +6,7 @@ Before you read further, this is a hobby project.  I am not a video professional
 
 ## Background
 
-To understand why this exists, you need to know a few things about video, DVDs, and upscaling.  Until recently, most Movies and TV shows were shot on film, at a frame rate of 24 FPS (actually 23.976025 or 24000/1001).  The rate at which TV screens refresh is tied to the cycle rate of the power they use.  In North America, this was 30 FPS (29.97003 or 30000/1001) and in Europe it was 25 FPS.  The North American standard is known as NTSC and the European standard is PAL.  There are other standards as well.  Screens are now somewhat more flexible than in the days of tube TVs, but we still live in a world where the standards were set in the past.  The problem here is that the rate at which the video was recorded and the rate at which is is displayed are different.  Several methods are used to make 24 FPS video play at 30 FPS or 25 FPS.  In North America, we used telecine to make 24 FPS content play like 30 FPS.  In Europe, since 24 and 25 FPS are so close, they usually just played 24 FPS content at 25 FPS. The video and audio play about 4% faster, but nobody really noticed.
+To understand why this exists, you need to know a few things about video, DVDs, and upscaling.  Until recently, most movies and TV shows were shot on film, at a frame rate of 24 FPS (actually 23.976025 or 24000/1001).  The rate at which TV screens refresh is tied to the cycle rate of the power they use.  In North America, this was 30 FPS (29.97003 or 30000/1001) and in Europe it was 25 FPS.  The North American standard is known as NTSC and the European standard is PAL.  There are other standards as well.  Screens are now somewhat more flexible than in the days of tube TVs, but we still live in a world where the standards were set in the past.  The problem here is that the rate at which the video was recorded and the rate at which is is displayed are different.  Several methods are used to make 24 FPS video play at 30 FPS or 25 FPS.  In North America, we used telecine to make 24 FPS content play like 30 FPS.  In Europe, since 24 and 25 FPS are so close, they usually just played 24 FPS content at 25 FPS. The video and audio play about 4% faster, but nobody really noticed.
 
 ### Telecine
 
@@ -81,7 +81,7 @@ The script is best at converting single method videos.  It can do the following 
 
 These conversions should give you a file with a consistent frame rate, and no introduced stutters, that can be processed in TVAI without resorting to an interlaced method.
 
-Mixed method conversion is still a work in progress.  It works a lot of the time, but it doesn't work at all for some combinations.
+Mixed method conversion is still a work in progress.  It works a lot of the time, but it doesn't work at all for some combinations.  This is a very slow process - the more segments, the longer it takes.  Figure that the processing time for a video with more than 10 segments will be at least twice the runtime of the video, so two hours for every hour of video.  The more segments, the longer it will take, because ffmpeg has to read from the beginning to the segment start every time.
 
 The script now creates a temp directory named 00DRP that contains log files and subdirectories for the output of all the intermediate steps.  If you find that a video didn't complete, check the log files and you are bound to discover that one of the segments needs adjustment.
 
@@ -105,7 +105,7 @@ You can run them through bash, like 'bash drp' or 'bash smap', but if you want t
 | drp | Batch mode - it will try to convert every MKV file in the current directory. |
 | drp -d | Dry run batch mode - it will try to diagnose every MKV file and then exit. |
 | drp file | Single file mode - it will convert the named file only. |
-| drp -d file | Dry run single file - it will diagnose only the name file. |
+| drp -d file | Dry run single file - it will diagnose only the named file. |
 | smap file | Single file mode - it will create a segment map for the named file. |
 
 There are settings at the top of each script file that you can change.  They are explained in the comments.
