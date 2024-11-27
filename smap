@@ -1,0 +1,285 @@
+#!/bin/bash
+# smap (Segment Mapper) bash script - Nov. 27 2024
+#
+# This script attempts to analyze an MKV file produced by MakeMKV from a DVD 
+# source and find where the original frame rates change in the video.  It
+# then creates a time map that drp can use to process the MKV.
+
+# Settings
+MINSEG="1"
+# Segments of less than 1 second duration are usually false positives.
+
+USERAMDISK=1
+# If enabled, the script will create an 8GB tmpfs memory filesystem.  This will 
+# consume 8GB of RAM for the duration that the script runs, so you probably 
+# wouldn't want to do this on a system that has less than 16GB of RAM.  
+#
+# Because this script writes out thousands of files per analysis, using a
+# memory filesystem seems like a good idea.  Writing lots of small files over
+# and over might accelerate disk wear.  This is disabled by default, but if you
+# have the RAM, I strongly recommend enabling it.
+#
+# If the script crashes or you break out of it, you will need to manually
+# unmount the filesystem.
+
+OUTDIR="/home/bill/data/2process" # Set to your output directory (default is home dir)
+TEMPDIR="$OUTDIR/00DRP"
+LOGDIR="$TEMPDIR/LOGS"
+SEGDIR="$TEMPDIR/segments"
+# End of settings
+
+function setup {
+	echo "Setting up directories and cleaning up from previous run."
+	if [ ! -d "$SEGDIR" ]; then
+		mkdir "$SEGDIR"
+	else
+		cd "$SEGDIR"
+		if [ $(pwd) == "$SEGDIR" ]; then
+			rm -f *
+		fi
+	fi
+	cd "$rundir" || exit 1
+	if [ "$USERAMDISK" == 1 ]; then
+		mntstatus=$(grep "SEGDIR" /proc/mounts |cut -d' ' -f 3)
+		if [ "$mntstatus" == "tmpfs" ]; then
+			echo "Memory filesystem already exists."
+		else
+			echo "Setting up memory filesystem.  You will be prompted to authenticate if not root."
+			sudo mount -o size=8G -t tmpfs none "$SEGDIR"
+		fi
+	fi
+	sleep 10
+}
+
+function makesegs {
+	echo "Dividing the input file into minimum time segments.  This is slow."
+	# The segment time of 0.1 effectively instructs ffmpeg to make the smallest
+	# possible segments.  Usually, the smallest it can go is about 1/2 second.
+	ffmpeg -an -sn \
+		-i "$infile" \
+		-f segment \
+		-segment_time 0.1 \
+		-reset_timestamps 1 \
+		-c:v copy "$SEGDIR/%05d.mkv"
+}
+
+function getstandard {
+	invres=$(ffprobe -v error -select_streams v -show_entries stream=height -of default=noprint_wrappers=1:nokey=1 00000.mkv)
+	if [ "$invres" -gt "480" ]; then
+		standard="PAL"
+		echo "Trying PAL frame rate analysis.  This is not reliable."
+	else
+		standard="NTSC"
+		echo "Trying NTSC frame rate analysis."
+	fi
+}
+
+function getfratesntsc {
+	echo "Getting the frame rate of each segment file.  This can take a long time."
+	for file in $(ls -1 *.mkv); do
+		curfile="$file"
+		filenum=$(echo "$curfile" |cut -d. -f1)
+		nextnum=$(printf "%05d" $((10#$filenum + 1)))
+		prevnum=$(printf "%05d" $((10#$filenum - 1)))
+		if [ "$prevnum" -lt 0 ]; then
+			prevnum="00000"
+		fi
+		if [ "$nextnum" -gt "$filecount" ]; then
+			nextnum="$(printf "%05d" "$filecount")"
+		fi
+		nextfile="$nextnum.mkv"
+		prevfile="$prevnum.mkv"
+	
+		curdurs=$(ffprobe -v error -select_streams v -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$curfile")
+		curframes=$(ffprobe -v error -select_streams v -count_packets -show_entries stream=nb_read_packets -of csv=p=0 "$curfile" |head -n 1)
+		curfrate=$(echo "$curframes / $curdurs" |bc -l)
+		nextdurs=$(ffprobe -v error -select_streams v -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$nextfile")
+		nextframes=$(ffprobe -v error -select_streams v -count_packets -show_entries stream=nb_read_packets -of csv=p=0 "$nextfile" |head -n 1)
+		nextfrate=$(echo "$nextframes / $nextdurs" |bc -l)
+		prevdurs=$(ffprobe -v error -select_streams v -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$prevfile")
+		prevframes=$(ffprobe -v error -select_streams v -count_packets -show_entries stream=nb_read_packets -of csv=p=0 "$prevfile" |head -n 1)
+		prevfrate=$(echo "$prevframes / $prevdurs" |bc -l)
+
+		cumtime=$(echo "$cumtime + $curdurs" |bc -l)
+
+		if [ "$(echo "$curfrate < 25" |bc -l)" -eq 1 ]; then
+			nomfrate="24FPS"
+		elif [ "$(echo "$curfrate > 28" |bc -l)" -eq 1 ]; then
+			nomfrate="30FPS"
+		else
+			# Frame rate is not diagnostic, so compare it to previous and next
+			# High point among marginal 24FPS
+			echo "Ambiguous frame rate at $curfile.  Trying before/after comparison."
+			if [ "$(echo "$curfrate <= 27" |bc -l)" -eq 1 ] && [ "$(echo "$prevfrate <= 26" |bc -l)" -eq 1 ] && [ "$(echo "$nextfrate <= 26" |bc -l)" -eq 1 ]; then
+				nomfrate="24FPS"
+			# Low point among marginal 30FPS
+			elif [ "$(echo "$curfrate >= 27" |bc -l)" -eq 1 ] && [ "$(echo "$prevfrate >= 28" |bc -l)" -eq 1 ] && [ "$(echo "$nextfrate >= 28" |bc -l)" -eq 1 ]; then
+				nomfrate="30FPS"
+			# Mid point between 24 and 30 FPS
+			elif [ "$(echo "$curfrate <= 27" |bc -l)" -eq 1 ] && [ "$(echo "$prevfrate < 27" |bc -l)" -eq 1 ] && [ "$(echo "$nextfrate > 27" |bc -l)" -eq 1 ]; then
+				nomrate="30FPS"
+			# Mid point between 30 and 24 FPS
+			elif [ "$(echo "$curfrate >= 27" |bc -l)" -eq 1 ] && [ "$(echo "$prevfrate > 27" |bc -l)" -eq 1 ] && [ "$(echo "$nextfrate < 27" |bc -l)" -eq 1 ]; then
+				nomrate="24FPS"
+			fi
+		fi
+
+	    echo "${line}:${curfile},${curdurs},${cumtime},${curframes},${curfrate},${nomfrate}" |tee -a "$reportfile"
+		line=$((line + 1))
+	done
+}
+
+function getfratespal {
+	echo "Getting the frame rate of each segment file.  This can take a long time."
+	for file in $(ls -1 *.mkv); do
+		echo "Working on $file"
+		curfile="$file"
+		filenum=$(echo "$curfile" |cut -d. -f1)
+		nextnum=$(printf "%05d" $((10#$filenum + 1)))
+		prevnum=$(printf "%05d" $((10#$filenum - 1)))
+		if [ "$prevnum" -lt 0 ]; then
+			prevnum="00000"
+		fi
+		if [ "$nextnum" -gt "$filecount" ]; then
+			nextnum="$(printf "%05d" "$filecount")"
+		fi
+		nextfile="$nextnum.mkv"
+		prevfile="$prevnum.mkv"
+	
+		curdurs=$(ffprobe -v error -select_streams v -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$curfile")
+		curframes=$(ffprobe -v error -select_streams v -count_packets -show_entries stream=nb_read_packets -of csv=p=0 "$curfile" |head -n 1)
+		curfrate=$(echo "$curframes / $curdurs" |bc -l)
+		nextdurs=$(ffprobe -v error -select_streams v -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$nextfile")
+		nextframes=$(ffprobe -v error -select_streams v -count_packets -show_entries stream=nb_read_packets -of csv=p=0 "$nextfile" |head -n 1)
+		nextfrate=$(echo "$nextframes / $nextdurs" |bc -l)
+		prevdurs=$(ffprobe -v error -select_streams v -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$prevfile")
+		prevframes=$(ffprobe -v error -select_streams v -count_packets -show_entries stream=nb_read_packets -of csv=p=0 "$prevfile" |head -n 1)
+		prevfrate=$(echo "$prevframes / $prevdurs" |bc -l)
+
+		cumtime=$(echo "$cumtime + $curdurs" |bc -l)
+
+		# PAL - This is very dodgy as I have little PAL material to test with
+		if [ "$(echo "$curfrate <= 26" |bc -l)" -eq 1 ]; then
+			nomfrate="24FPS"
+		elif [ "$(echo "$curfrate > 26" |bc -l)" -eq 1 ]; then
+			nomfrate="50FPS"
+		else
+			nomfrate="Mix"
+		fi
+
+		echo "${curfile},${curdurs},${cumtime},${curframes},${curfrate},${nomfrate}" >>"$rawreportfile"
+		if [ "$nomfrate" != "Mix" ]; then
+		    echo "${line}:${curfile},${curdurs},${cumtime},${curframes},${curfrate},${nomfrate}" >>"$reportfile"
+			line=$((line + 1))
+		fi
+	done
+}
+
+function gettrans {
+	echo "Now finding every segment that appears to represent a frame rate transition."
+	transfile="$infilename.trans"
+	if [ -f "$transfile" ]; then
+		rm -f "$transfile" || exit 1
+	fi
+	prevrate=$(sed -n 1,1p "$reportfile"|cut -d, -f6)
+	for line in $(cat "$reportfile"); do
+		currate=$(echo "$line"|cut -d, -f6)
+		if [ "$currate" != "$prevrate" ]; then
+			echo "$line" >>"$transfile"
+		fi
+		prevrate="$currate"
+	done
+}
+
+function makemapfile {
+	echo -n "start," >"$mapfile"
+	for line in $(cat "$transfile"); do
+		grep -C1 "$line" "$reportfile" >triplet.txt
+		# Refine the transition time
+		echo "Experimental time adjustment begins here."
+		nomfratetop=$(sed -n 1,1p triplet.txt|cut -d, -f6)
+		nomfratemid=$(sed -n 2,2p triplet.txt|cut -d, -f6)
+		nomfratebot=$(sed -n 3,3p triplet.txt|cut -d, -f6)
+		echo "$nomfratetop, $nomfratemid, $nomfratebot"
+		truefratetop=$(sed -n 1,1p triplet.txt|cut -d, -f5)
+		truefratemid=$(sed -n 2,2p triplet.txt|cut -d, -f5)
+		truefratebot=$(sed -n 3,3p triplet.txt|cut -d, -f5)
+		echo "$truefratetop, $truefratemid, $truefratebot"
+		dursmid=$(sed -n 2,2p triplet.txt|cut -d, -f2)
+		ratediff="$(echo "$truefratemid - 23.976" |bc -l)"
+		difffrac="$(echo "$ratediff / 5.99" |bc -l)"
+		timeadj="$(echo "$dursmid * $difffrac" |bc -l)"
+		echo "$dursmid, $ratediff, $difffrac, $timeadj"
+		if [ "$(echo "$nomfratetop > $nomfratebot" |bc -l)" -eq 1 ]; then
+			# 30 to 24
+			modadj="$timeadj"
+		else
+			# 24 to 30
+			modadj="$(echo "$dursmid - $timeadj" |bc -l)"
+		fi
+		echo "$modadj"
+
+		cumtime=$(echo "$line" |cut -d, -f3 |cut -d, -f1)
+		cumtimefinal="$(echo "$cumtime - $modadj" |bc -l)"
+		echo "$cumtime, $cumtimefinal"
+		evenodd=$((count % 2))
+		cumtimediff="$(echo "$cumtimefinal - $prevcumtime" |bc -l)"
+		if [ "$(echo "$cumtimediff >= $MINSEG" |bc -l)" -eq 1 ]; then
+			if [ "$evenodd" = 0 ]; then
+				echo "$cumtimefinal" >>"$mapfile"
+				echo -n "$cumtimefinal," >>"$mapfile"
+			else
+				echo "$cumtimefinal" >>"$mapfile"
+				echo -n "$cumtimefinal," >>"$mapfile"
+			fi
+			count=$((count + 1))
+			prevcumtime="$cumtimefinal"
+		fi
+		echo "Experimental time adjustment ends here."
+	done
+	echo "end" >>"$mapfile"
+}
+
+IFS=$'\n'
+rundir="$(pwd)"
+
+infile="$1"
+infilename="$(echo $infile |cut -d. -f1)"
+
+if [ ! -f "$infile" ]; then
+	echo "ERROR: No input file specified.  Run 'segmapper <file>'"
+	exit 1
+fi
+
+setup
+makesegs
+
+cd $SEGDIR || exit 1
+getstandard
+
+cumtime=0
+line=0
+reportfile="$infilename.rates"
+filecount=$(($(ls -1 *.mkv |wc -l) - 1))
+
+if [ "$standard" == "NTSC" ]; then
+	getfratesntsc
+else
+	getratespal
+fi
+
+gettrans
+
+cumtime=0
+count=2
+max="$(wc -l <$transfile)"
+prevcumtime=0
+mapfile="$rundir/$infilename.smap"
+
+makemapfile
+
+if [ "$USERAMDISK" == 1 ]; then
+	cd "$rundir"
+	echo "Unmounting memory filesystem.  You may be prompted to authenticate if not root."
+	sudo umount "$SEGDIR"
+fi
