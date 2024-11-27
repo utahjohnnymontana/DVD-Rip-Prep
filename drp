@@ -1,5 +1,5 @@
 #!/bin/bash
-# drp (DVD Rip Prep) bash script - Nov. 21 2024
+# drp (DVD Rip Prep) bash script - Nov. 27 2024
 #
 # This script attempts to take an MKV file produced by MakeMKV from a DVD source
 # and output a new file without telecine or interlacing and at the correct frame
@@ -46,17 +46,49 @@ ALLOWRTLOSS="0.001" # Fraction of runtime loss that is allowed (about 4s per hou
 # before wasting time upscaling them if they are out of sync.  It is safe to set
 # this to zero if you don't want to deal with the additional work.
 
-HTCTHRESH="0.7"
-# HTCTHRESH defines the fraction of frames that the script considers to mark hard 
-# telecine.
+HTCTHRESH="1"
+INTLTHRESH="20"
+# HTCTHRESH and INTLTHRESH define the percentage of frames that mark hard telecine
+# and true interlacing, respectively.
+
+OUTPUTJOIN=1
+OUTPUTSEGS=0
+# The script can output either or both of the processed segments or the segments
+# rejoined into a single file.  You might want the segments if you plan to upscale
+# them individually.  Default is to output only the rejoined file.
 
 MERGEMKV=1 # Set to 0 to disable merging
 # By default, the script outputs a file containing only the video track, as this
 # seems to work better with TVAI sometimes.  If you enable merging, then it will
 # also output a copy that is merged with the original MKV, which allows you to
-# compare the two video tracks and make sure that the audio syncs up.
+# compare the two video tracks and make sure that the audio syncs up.  OUTPUTJOIN
+# must be 1 for this to work.
 
-OUTDIR=~ # Set to your output directory (default is home dir)
+FIXRATE=1
+# What to do when a file contains more than one true frame rate.  That is, after
+# applying detelecine, do we now have a mix of 24FPS video and deinterlaced 30
+# FPS video?  If so, the script can:
+# 0 - Do nothing.  If you set this to zero, then OUTPUTSEGS should be 1.
+# 1 - Reduce the frame rate to 24 FPS by dropping frames from 30FPS segments.
+# 2 - Increase all segments to 120 FPS by quintupling 24 and quadrupling 30.
+# The default of 1 works well for most of my library, in which 30FPS sections
+# tend to be short, but it does drop frames to get the lower frame rate, so it
+# is destructive.  In videos that have substantial 30 FPS segments, 2 would be 
+# a better approach.  2 is always the lossless approach, but 120 FPS videos
+# might not play on everything.
+
+AUTOMAP=1
+# If enabled, run the segment mapper in batch mode.  If disabled, you will need
+# to run smap on mixed files manually.  Default is disabled because mapping is
+# a slow and resource intensive process.
+
+MAPPER="$(dirname "$0")/smap"
+# Specify the location of the segment mapper script.  The default is the smap
+# script that comes with drp, but you could potentially modify your own mapper 
+# to meet different requirements.  All that it needs to do is accept a file 
+# name as input and output a segment map file.
+
+OUTDIR="/home/bill/data/2process" # Set to your output directory (default is home dir)
 TEMPDIR="$OUTDIR/00DRP"
 LOGDIR="$TEMPDIR/LOGS"
 STEP1DIR="$TEMPDIR/STEP1"
@@ -81,10 +113,25 @@ function setup {
 	else
 		echo "Post process interlace counting is disabled"
 	fi
+	if [ "$OUTPUTJOIN" = 1 ]; then
+		echo "Outputting rejoined video is enabled."
+	else
+		echo "Outputting rejoined video is disabled."
+	fi
+	if [ "$OUTPUTSEGS" = 1 ]; then
+		echo "Outputting unjoined segments is enabled."
+	else
+		echo "Outputting unjoined segments is disabled."
+	fi
 	if [ "$MERGEMKV" = 1 ]; then
 		echo "Merging output with the original MKV is enabled."
 	else
 		echo "Merging output with the original MKV is disabled"
+	fi
+	if [ "$AUTOMAP" = 1 ]; then
+		echo "Automatic mapping is enabled, using $MAPPER."
+	else
+		echo "Automatic mapping is disabled"
 	fi
 	if [ "$dryrun" = 1 ]; then
 		echo "Doing a dry run..."
@@ -132,18 +179,18 @@ function cleanup {
 			rm -f * >/dev/null 2>&1
 		fi
 	fi
-	if [ -d "$STEP1DIR" ] && [ "$dryrun" != 1 ]; then
-		cd "$STEP1DIR" || exit 1
-		if [ "$(pwd)" == "$STEP1DIR" ]; then
-			rm -f * >/dev/null 2>&1
-		fi
-	fi
-	if [ -d "$STEP2DIR" ] && [ "$dryrun" != 1 ]; then
-		cd "$STEP2DIR" || exit 1
-		if [ "$(pwd)" == "$STEP2DIR" ]; then
-			rm -f * >/dev/null 2>&1
-		fi
-	fi
+	#if [ -d "$STEP1DIR" ] && [ "$dryrun" != 1 ]; then
+	#	cd "$STEP1DIR" || exit 1
+	#	if [ "$(pwd)" == "$STEP1DIR" ]; then
+	#		rm -f * >/dev/null 2>&1
+	#	fi
+	#fi
+	#if [ -d "$STEP2DIR" ] && [ "$dryrun" != 1 ]; then
+	#	cd "$STEP2DIR" || exit 1
+	#	if [ "$(pwd)" == "$STEP2DIR" ]; then
+	#		rm -f * >/dev/null 2>&1
+	#	fi
+	#fi
 	if [ -d "$STEP3DIR" ] && [ "$dryrun" != 1 ]; then
 		cd "$STEP3DIR" || exit 1
 		if [ "$(pwd)" == "$STEP3DIR" ]; then
@@ -295,7 +342,7 @@ function hardtelecine {
 		-stats \
 		-i "$file" \
 		-an -sn \
-		-vf "fieldmatch,decimate" \
+		-vf "fieldmatch,decimate,bwdif=mode=send_field:deint=interlaced" \
 		-r 24000/1001 \
 		-c:v ffv1 "$outfile"
 	checkinterlace
@@ -355,6 +402,7 @@ function mixed {
 		runsegments
 		step=3
 		segconcat
+		outputsegs
 		step=4
 		checkduration
 		segfail=0
@@ -414,22 +462,32 @@ function runsegments {
 }
 
 function segconcat {
-	inname="$(echo "$infile" |cut -d. -f1)"
-	outname="${inname}-rejoined.mkv"
-	outfile="$OUTDIR/$outname"
-	cd "$STEP3DIR" ||exit 1
-	if [ -f concat.txt ] && [ "$segfail" != 1 ]; then
-		echo "Running step 4 (rejoining segments)." |tee -a "$logfile"
-		ffmpeg -n \
-			-hide_banner \
-			-v warning \
-			-stats \
-			-f concat \
-			-safe 0 \
-			-i concat.txt \
-			-c copy "$outfile"
-	else
-		echo "ERROR: Unexpected concatenation failure."
+	if [ "$OUTPUTJOIN" == "1" ]; then
+		echo "Rejoining the segment files..."
+		inname="$(echo "$infile" |cut -d. -f1)"
+		outname="${inname}-rejoined.mkv"
+		outfile="$OUTDIR/$outname"
+		cd "$STEP3DIR" ||exit 1
+		if [ -f concat.txt ] && [ "$segfail" != 1 ]; then
+			echo "Running step 4 (rejoining segments)." |tee -a "$logfile"
+			ffmpeg -n \
+				-hide_banner \
+				-v warning \
+				-stats \
+				-f concat \
+				-safe 0 \
+				-i concat.txt \
+				-c copy "$outfile"
+		else
+			echo "ERROR: Unexpected concatenation failure."
+		fi
+	fi
+}
+
+function outputsegs {
+	if [ "$OUTPUTSEGS" == "1" ]; then
+		echo "Outputting separate segment files..."
+		cp "$STEP3DIR/*.mkv" "$OUTDIR"
 	fi
 }
 
@@ -449,9 +507,10 @@ function prepsegments {
 			echo "Step 1 conversion already exists, so using it." |tee -a "$logfile"
 		fi
 		echo "Running step 2 (division into segments)." |tee -a "$logfile"
-		tsfile="${inname}.times"
-		if [ -f "$tsfile" ]; then
-			echo "Timecode file detected, making custom segments." |tee -a "$logfile"
+		tsfile="${inname}.smap"
+		segstatus=$(ls -1 $STEP2DIR/*.mkv |wc -l)
+		if [ -f "$tsfile" ] && [ "$segstatus" == 0 ]; then
+			echo "Segment map file detected, making custom segments." |tee -a "$logfile"
 			segindex=1
 			for segment in $(cat "$tsfile"); do
 				starttime="$(echo "$segment" |cut -d, -f1)"
@@ -459,17 +518,37 @@ function prepsegments {
 				if [ "$starttime" == "start" ]; then
 					startframe=1
 				else
-					startframe="$(ffmpeg -y -t $starttime -i $outfile -nostats -c copy -f rawvideo /dev/null 2>&1 |grep "frame" |sed 's/ fps.*//' |cut -d= -f2)"
+					startframe="$(ffmpeg -y \
+									-t $starttime \
+									-i $outfile \
+									-nostats \
+									-c copy \
+									-f rawvideo /dev/null \
+								2>&1 |grep "frame" |sed 's/ fps.*//' |cut -d= -f2)"
 				fi
 				if [ "$endtime" == "end" ]; then
-					endframe="$(ffprobe -v error -select_streams v -count_packets -show_entries stream=nb_read_packets -of csv=p=0 "$outfile" |head -n 1)"
+					endframe="$(ffprobe -v error \
+									-select_streams v \
+									-count_packets \
+									-show_entries stream=nb_read_packets \
+									-of csv=p=0 "$outfile" |head -n 1)"
 				else
-					endframe="$(ffmpeg -y -t $endtime -i $outfile -nostats -c copy -f rawvideo /dev/null 2>&1 |grep "frame" |sed 's/ fps.*//' |cut -d= -f2)"
+					endframe="$(ffmpeg -y \
+									-t $endtime \
+									-i $outfile \
+									-nostats \
+									-c copy \
+									-f rawvideo /dev/null \
+								2>&1 |grep "frame" |sed 's/ fps.*//' |cut -d= -f2)"
 				fi
 				if [ $segindex -gt 1 ]; then
 					startframe=$((startframe + 1))
 				fi
-				segname="$inname-segment-$segindex-ffv1.mkv"
+				if [ "$segindex" -lt 10 ]; then
+					segname="$inname-segment-0$segindex-ffv1.mkv"
+				else
+					segname="$inname-segment-$segindex-ffv1.mkv"
+				fi
 				segfile="$STEP2DIR/$segname"
 				echo "Working on $segfile..."
 				ffmpeg -n \
@@ -483,7 +562,7 @@ function prepsegments {
 					-vcodec ffv1 "$segfile"
 				segindex=$((segindex + 1))
 			done
-		else
+		elif [ "$segstatus" == 0 ]; then
 			echo "Making 60 second segments." |tee -a "$logfile"
 			segname="$inname-segment-%03d-ffv1.mkv"
 			segfile="$STEP2DIR/$segname"
@@ -493,6 +572,8 @@ function prepsegments {
 				-segment_time 60 \
 				-reset_timestamps 1 \
 				-vcodec ffv1 "$segfile"
+		else
+			echo "Using existing Step 2 segments." |tee -a "$logfile"
 		fi
 }
 
@@ -505,21 +586,33 @@ function ntscinterlaced {
 	else
 		echo "ERROR: Input step does not make sense.  This is probably a bug."
 	fi
-	ffmpeg -n \
-		-hide_banner \
-		-v warning \
-		-stats \
-		-i "$file" \
-		-an -sn \
-		-vf "bwdif" \
-		-r 30000/1001 \
-		-c:v ffv1 "$outfile"
+	if [ "$step" == 1 ]; then
+		ffmpeg -n \
+			-hide_banner \
+			-v warning \
+			-stats \
+			-i "$file" \
+			-an -sn \
+			-vf "bwdif=mode=send_field" \
+			-r 30000/1001 \
+			-c:v ffv1 "$outfile"
+	else
+		ffmpeg -n \
+			-hide_banner \
+			-v warning \
+			-stats \
+			-i "$file" \
+			-an -sn \
+			-vf "bwdif=mode=send_field" \
+			-r 24000/1001 \
+			-c:v ffv1 "$outfile"
+	fi
 	checkduration
 }
 
 function checkinterlace {
 	if [ "$1" == "pre" ]; then
-		echo;echo "Counting interlaced frames in the input.  This takes a while."  |tee -a "$logfile"
+		echo "Counting interlaced frames in the input.  This takes a while."  |tee -a "$logfile"
 		idetout=$(ffmpeg -an -filter:v idet -f null - -i "$file" 2>&1 |grep -m1 "Parsed_idet")
 		nonrep=$(echo "$idetout" |tr -d '[:alpha:]' |tr -d ' ' |cut -d: -f3)
 		echo "Non-repeating Frames: $nonrep" |tee -a "$logfile"
@@ -537,11 +630,11 @@ function checkinterlace {
 		esac
 		intlfields=$((toprep + botrep))
 		progfields=$((inframes - intlfields))
-		ifratio=$(echo "$progfields / $inframes" |bc -l)
-		echo "Progressive/Interlaced Ratio: $ifratio" |tee -a "$logfile"
+		pctintl=$(echo "($intlfields / $inframes) * 100" |bc -l)
+		echo "Percent interlaced: $pctintl" |tee -a "$logfile"
 		echo
 	elif [ $ICHECK = 1 ]; then
-		echo;echo "Counting interlaced frames in the output.  This takes a while."  |tee -a "$logfile"
+		echo "Counting interlaced frames in the output.  This takes a while."  |tee -a "$logfile"
 		idetout2=$(ffmpeg -an -filter:v idet -f null - -i "$outfile" 2>&1 |grep -m1 "Parsed_idet")
 		inframes2=$(mediainfo --Inform='Video;%FrameCount%' "$outfile")
 		echo "Frame Count: $inframes2" |tee -a "$logfile"
@@ -561,8 +654,8 @@ function checkinterlace {
 		esac
 		intlfields2=$((toprep2 + botrep2))
 		progfields2=$((inframes2 - intlfields2))
-		ifratio2=$(echo "${progfields2} / ${inframes2}" |bc -l)
-		echo "Progressive/Interlaced Ratio: ${ifratio2}" |tee -a "$logfile"
+		pctintl=$(echo "($intlfields / $inframes) * 100" |bc -l)
+		echo "Percent interlaced: $pctintl" |tee -a "$logfile"
 		echo
 	fi			
 }
@@ -586,14 +679,31 @@ function process {
 	invres=$(ffprobe -v error -select_streams v -show_entries stream=height -of default=noprint_wrappers=1:nokey=1 "$file")
 	echo "Vertical Resolution: $invres" |tee -a "$logfile"
 	echo "Calculated Frame Rate: $infrate" |tee -a "$logfile"
-	if [ "$(echo "$infrate > 24.95" |bc -l)" -eq 1 ] && [ "$(echo "$infrate < 25.05" |bc -l)" -eq 1 ] && [ "$(echo "$invres > 480" |bc -l)" -eq 1 ]; then
-		nomfrate="25FPS"
-	elif [ "$(echo "$infrate > 23.7" |bc -l)" -eq 1 ] && [ "$(echo "$infrate < 24.2" |bc -l)" -eq 1 ]; then
-		nomfrate="24FPS"
-	elif [ "$(echo "$infrate > 29.6" |bc -l)" -eq 1 ] && [ "$(echo "$infrate < 30.3" |bc -l)" -eq 1 ]; then
-		nomfrate="30FPS"
+	if [ "$step" == 2 ]; then
+		if [ "$(echo "$infrate < 27" |bc -l)" -eq 1 ]; then
+			nomfrate="24FPS"
+		else
+			nomfrate="30FPS"
+		fi
 	else
-		nomfrate="Mix"
+		if [ "$(echo "$invres > 480" |bc -l)" -eq 1 ]; then
+			standard="PAL"
+			if [ "$(echo "$infrate > 24.5" |bc -l)" -eq 1 ] && [ "$(echo "$infrate < 25.5" |bc -l)" -eq 1 ]; then
+				nomfrate="25FPS"
+			else
+				echo "ERROR: Unexpected PAL frame rate."
+				exit 1
+			fi
+		else
+			standard="NTSC"
+			if [ "$(echo "$infrate < 24.1" |bc -l)" -eq 1 ]; then
+				nomfrate="24FPS"
+			elif [ "$(echo "$infrate > 29.9" |bc -l)" -eq 1 ]; then
+				nomfrate="30FPS"
+			else
+				nomfrate="Mix"
+			fi
+		fi
 	fi
 	echo "Nominal Frame Rate: $nomfrate" |tee -a "$logfile"
 
@@ -605,7 +715,7 @@ function process {
 	# the threshhold does correctly identify progressive and interlaced videos, even though the
 	# number does not really make any sense.
 		checkinterlace pre
-		if [ "$(echo "$ifratio >= 0.998" |bc -l)" -eq 1 ]; then
+		if [ "$(echo "$pctintl <= 1" |bc -l)" -eq 1 ]; then
 			echo "Diagnosis: PAL progressive video at 25FPS." |tee -a "$logfile"
 			sleep 5; echo
 			if [ ! "$dryrun" = 1 ]; then
@@ -635,25 +745,16 @@ function process {
 		fi
 	elif [ "$nomfrate" == "30FPS" ]; then
 		checkinterlace pre
-		if [ "$(echo "$ifratio >= 0.995" |bc -l)" -eq 1 ]; then
-			echo "Diagnosis: Improperly deinterlaced hard telecined video at 24FPS." |tee -a "$logfile"
+		if [ "$(echo "$pctintl < $HTCTHRESH" |bc -l)" -eq 1 ]; then
+			echo "Diagnosis: Misdetected soft telecine." |tee -a "$logfile"
 			sleep 5; echo
 			if [ ! "$dryrun" == 1 ]; then
-				htc2di
+				softtelecine
 			else
-				echo "$file: Improperly Deinterlaced Hard Telecine 24FPS" >>diagreport.txt
+				echo "$file: Misdetected Soft Telecine 24FPS" >>diagreport.txt
 				echo "Exiting dry run." |tee -a "$logfile"
 			fi
-		elif [ "$(echo "$ifratio >= $HTCTHRESH" |bc -l)" -eq 1 ]; then
-			echo "Diagnosis: Hard telecined video at 24 FPS." |tee -a "$logfile"
-			sleep 5; echo
-			if [ ! "$dryrun" = 1 ]; then
-				hardtelecine
-			else
-				echo "$file: Hard Telecine 24FPS" >>diagreport.txt
-				echo "Exiting dry run." |tee -a "$logfile"
-			fi
-		elif [ "$(echo "$ifratio <= $HTCTHRESH" |bc -l)" -eq 1 ]; then
+		elif [ "$(echo "$pctintl >= $INTLTHRESH" |bc -l)" -eq 1 ]; then
 			echo "Diagnosis: True, interlaced NTSC video at 30FPS." |tee -a "$logfile"
 			sleep 5; echo
 			if [ ! "$dryrun" = 1 ]; then
@@ -662,14 +763,30 @@ function process {
 				echo "$file: True Interlaced 30FPS" >>diagreport.txt
 				echo "Exiting dry run." |tee -a "$logfile"
 			fi
+		elif [ "$(echo "$pctintl >= $HTCTHRESH" |bc -l)" -eq 1 ]; then
+			echo "Diagnosis: Hard telecined video at 24 FPS." |tee -a "$logfile"
+			sleep 5; echo
+			if [ ! "$dryrun" = 1 ]; then
+				hardtelecine
+			else
+				echo "$file: Hard Telecine 24FPS" >>diagreport.txt
+				echo "Exiting dry run." |tee -a "$logfile"
+			fi
 		fi
 	elif [ "$nomfrate" == "Mix" ]; then
 		echo "Diagnosis: Mixed progressive, telecined, and/or interlaced video." |tee -a "$logfile"
 		sleep 5; echo
 		if [ ! "$dryrun" = 1 ]; then
+			if [ ! -f "${inname}.smap" ] && [ "$AUTOMAP" == 1 ]; then
+				"$MAPPER" "$file"
+			fi
 			mixed
 		else
-			echo "$file: Mixed Methods NEEDS SEGMENT MAP" >>diagreport.txt
+			echo "$file: Mixed Methods" >>diagreport.txt
+			echo "$file" >>maplist.txt
+			if [ "$AUTOMAP" == 1 ]; then
+				"$MAPPER" "$file"
+			fi
 			echo "Exiting dry run." |tee -a "$logfile"
 		fi
 	else
