@@ -95,7 +95,7 @@ As far as I can tell, any content that you find on a PAL format DVD that was ori
 
 ### Installation
 
-The script requires a system that runs a bash shell (linux/unix/mac or Windows with the linux subsystem) and ffmpeg, mediainfo, and mkvtoolnix must be installed.  I have only tested it on Ubuntu Linux, so there might well be minor compatibility problems with other distros or systems.
+The script requires a system that runs a bash shell (Linux/Unix/Mac or Windows with the Linux subsystem) and ffmpeg, mediainfo, and mkvtoolnix must be installed.  I have only tested it on Ubuntu Linux, so there might well be minor compatibility problems with other distros or systems.  I will do my best to fix problems that crop up on other platforms, but my experience with them is limited.
 
 The two scripts, drp and smap, are just bash scripts and can be installed anywhere that is convenient.  You might just keep them in your home directory.  If you want them to be in path, then the /usr/local/bin directory wouldn't be a bad place to put them.
 
