@@ -100,6 +100,8 @@ You can run them through bash, like 'bash drp' or 'bash smap', but if you want t
 
 ### Usage
 
+| Command | Description |
+| --- | --- |
 | 'drp' | Batch mode - it will try to convert every MKV file in the current directory. |
 | 'drp -d' | Dry run batch mode - it will try to diagnose every MKV file and then exit. |
 | 'drp file' | Single file mode - it will convert the named file only. |
