@@ -34,7 +34,7 @@ the video.
 
 ### Analysis
 
-The most basic feature of the script is to diagnose what kind of structure a DVD rip has.  You can use the script in dry run mode, which will just output a report in the same directory that you run it from that lists the diagnosis for each file.  To use this feature, just change to a directory containing your MKV files and run drp -d.
+The most basic feature of the script is to diagnose what kind of frame structure a DVD rip has.  You can use the script in dry run mode, which will just output a report in the same directory that you run it from that lists the diagnosis for each file.  To use this feature, just change to a directory containing your MKV files and run drp -d.
 
 The script will output two files: diagreport.txt and maplist.txt.  The diagreport.txt file lists the dignosis for each file.  The maplist.txt file contains a list of files that use mixed methods and need further analysis.  If AUTOMAP is enabled, then the script will continue to analyse and produce segment maps for each of these files.
 
