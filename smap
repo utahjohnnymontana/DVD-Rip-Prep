@@ -22,7 +22,7 @@ USERAMDISK=1
 # If the script crashes or you break out of it, you will need to manually
 # unmount the filesystem.
 
-OUTDIR="/home/bill/data/2process" # Set to your output directory (default is home dir)
+OUTDIR="~" # Set to your output directory (default is home dir)
 TEMPDIR="$OUTDIR/00DRP"
 LOGDIR="$TEMPDIR/LOGS"
 SEGDIR="$TEMPDIR/segments"

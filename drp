@@ -88,7 +88,7 @@ MAPPER="$(dirname "$0")/smap"
 # to meet different requirements.  All that it needs to do is accept a file 
 # name as input and output a segment map file.
 
-OUTDIR="/home/bill/data/2process" # Set to your output directory (default is home dir)
+OUTDIR="~" # Set to your output directory (default is home dir)
 TEMPDIR="$OUTDIR/00DRP"
 LOGDIR="$TEMPDIR/LOGS"
 STEP1DIR="$TEMPDIR/STEP1"
