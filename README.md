@@ -87,6 +87,10 @@ The script now creates a temp directory named 00DRP that contains log files and 
 
 By default, the final output of the script will be both a "rejoined" MKV that contains only the video and a "merged" MKV that add the source MKV file back in.  You should use the rejoined file for your TVAI upscaling.  The merged file is primarily there so that you can check it and make sure that the audio still syncs.
 
+#### PAL Conversion
+
+As far as I can tell, any content that you find on a PAL format DVD that was originally shot on film is just sped up from 24 to 25 FPS.  Drp will convert this by slowing the video back down to 24 FPS.  It will also output an audio file that is slowed to the same rate so that you can ensure that the audio still syncs up.  Assuming that the DVD contains multiple audio and subtitle tracks, you will need to slow those down to match the video.  I recommend doing this with MKVtoolnix using the stretch option.  Just enter 1.042708289 for the stretch value for each track.  If you don't want PAL conversion, set CONVPAL to 0 in the drp script.
+
 ### Installation
 
 The script requires a system that runs a bash shell (linux/unix/mac or Windows with the linux subsystem) and ffmpeg, mediainfo, and mkvtoolnix must be installed.  I have only tested it on Ubuntu Linux, so there might well be minor compatibility problems with other distros or systems.
