@@ -46,8 +46,8 @@ ALLOWRTLOSS="0.001" # Fraction of runtime loss that is allowed (about 4s per hou
 # before wasting time upscaling them if they are out of sync.  It is safe to set
 # this to zero if you don't want to deal with the additional work.
 
-HTCTHRESH="1"
-INTLTHRESH="20"
+HTCTHRESH="7"
+INTLTHRESH="26"
 # HTCTHRESH and INTLTHRESH define the percentage of frames that mark hard telecine
 # and true interlacing, respectively.
 
@@ -673,6 +673,7 @@ function checkinterlace {
 function process {
 	inname=$(echo "$file" |cut -d. -f1)
 	logtime="$(date +%s)"
+	echo "--------------------------------------------------"
 	if [ $WRITELOGS = 1 ] && [ "$dryrun" != 1 ]; then
 		logfile="$LOGDIR/${inname}.${logtime}.log"
 		echo "Logging to: $logfile"
@@ -682,7 +683,6 @@ function process {
 	else
 		logfile="/dev/null"
 	fi
-	echo
 	echo "Working on file: $file" |tee -a "$logfile"
 	indurs=$(ffprobe -v error -select_streams v -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$file")
 	echo "Duration: $indurs" |tee -a "$logfile"
@@ -756,12 +756,12 @@ function process {
 	elif [ "$nomfrate" == "30FPS" ]; then
 		checkinterlace pre
 		if [ "$(echo "$pctintl < $HTCTHRESH" |bc -l)" -eq 1 ]; then
-			echo "Diagnosis: Misdetected soft telecine." |tee -a "$logfile"
+			echo "Diagnosis: True, interlaced NTSC video at 30FPS." |tee -a "$logfile"
 			sleep 5; echo
 			if [ ! "$dryrun" == 1 ]; then
-				softtelecine
+				ntscinterlaced
 			else
-				echo "$file: Misdetected Soft Telecine 24FPS" >>diagreport.txt
+				echo "$file: True Interlaced 30FPS" >>diagreport.txt
 			fi
 		elif [ "$(echo "$pctintl >= $INTLTHRESH" |bc -l)" -eq 1 ]; then
 			echo "Diagnosis: True, interlaced NTSC video at 30FPS." |tee -a "$logfile"
