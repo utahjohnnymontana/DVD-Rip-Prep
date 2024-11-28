@@ -46,20 +46,10 @@ ALLOWRTLOSS="0.001" # Fraction of runtime loss that is allowed (about 4s per hou
 # before wasting time upscaling them if they are out of sync.  It is safe to set
 # this to zero if you don't want to deal with the additional work.
 
-HTCTHRESH="1"
-INTLTHRESH="26"
+HTCTHRESH="5"
+INTLTHRESH="50"
 # HTCTHRESH and INTLTHRESH define the percentage of frames that mark hard telecine
 # and true interlacing, respectively.
-# Idet gives results that seem pretty weird to me, but after extensive testing, I
-# have found that most true interlaced video counts out as under 1% interlaced or
-# occasionally greater than 30%.  Everything that falls in between 1 and 26
-# percent appears to be hard telecined or a combination of hard telecine with some
-# interlacing, which the hard telecine method handles by following inverse
-# telecine with a deinterlace on marked frames.  The range between 1 and 6 percent
-# is often associated with interlacing applied over the top of telecined content
-# or perhaps vice versa.  Might need more fine tuning here.
-# Why does idet find more interlaced frames in hard telecined video than fully
-# interlaced video?  Maybe I am using it wrong.
 
 OUTPUTJOIN=1
 OUTPUTSEGS=0
@@ -98,7 +88,7 @@ MAPPER="$(dirname "$0")/smap"
 # to meet different requirements.  All that it needs to do is accept a file 
 # name as input and output a segment map file.
 
-OUTDIR="~" # Set to your output directory (default is home dir)
+OUTDIR="/home/bill/data/2process" # Set to your output directory (default is home dir)
 TEMPDIR="$OUTDIR/00DRP"
 LOGDIR="$TEMPDIR/LOGS"
 STEP1DIR="$TEMPDIR/STEP1"
@@ -199,18 +189,18 @@ function cleanup {
 			rm -f * >/dev/null 2>&1
 		fi
 	fi
-	if [ -d "$STEP1DIR" ] && [ "$dryrun" != 1 ]; then
-		cd "$STEP1DIR" || exit 1
-		if [ "$(pwd)" == "$STEP1DIR" ]; then
-			rm -f * >/dev/null 2>&1
-		fi
-	fi
-	if [ -d "$STEP2DIR" ] && [ "$dryrun" != 1 ]; then
-		cd "$STEP2DIR" || exit 1
-		if [ "$(pwd)" == "$STEP2DIR" ]; then
-			rm -f * >/dev/null 2>&1
-		fi
-	fi
+	#if [ -d "$STEP1DIR" ] && [ "$dryrun" != 1 ]; then
+	#	cd "$STEP1DIR" || exit 1
+	#	if [ "$(pwd)" == "$STEP1DIR" ]; then
+	#		rm -f * >/dev/null 2>&1
+	#	fi
+	#fi
+	#if [ -d "$STEP2DIR" ] && [ "$dryrun" != 1 ]; then
+	#	cd "$STEP2DIR" || exit 1
+	#	if [ "$(pwd)" == "$STEP2DIR" ]; then
+	#		rm -f * >/dev/null 2>&1
+	#	fi
+	#fi
 	if [ -d "$STEP3DIR" ] && [ "$dryrun" != 1 ]; then
 		cd "$STEP3DIR" || exit 1
 		if [ "$(pwd)" == "$STEP3DIR" ]; then
@@ -633,25 +623,51 @@ function ntscinterlaced {
 function checkinterlace {
 	if [ "$1" == "pre" ]; then
 		echo "Counting interlaced frames in the input.  This takes a while."  |tee -a "$logfile"
-		idetout=$(ffmpeg -an -filter:v idet -f null - -i "$file" 2>&1 |grep -m1 "Parsed_idet")
-		nonrep=$(echo "$idetout" |tr -d '[:alpha:]' |tr -d ' ' |cut -d: -f3)
-		echo "Non-repeating Frames: $nonrep" |tee -a "$logfile"
-		toprep=$(echo "$idetout" |tr -d '[:alpha:]' |tr -d ' ' |cut -d: -f4)
-		echo "Top Fields: $toprep" |tee -a "$logfile"
-		botrep=$(echo "$idetout" |tr -d '[:alpha:]' |tr -d ' ' |cut -d: -f5)
-		echo "Bottom Fields: $botrep" |tee -a "$logfile"
-		case "$toprep" in
-			''|*[!0-9]*) toprep=0 ;;
+		ffmpeg -an -sn \
+			-hide_banner \
+			-stats \
+			-filter:v idet \
+			-f null - \
+			-i "$file" 2>"/tmp/idet.out"
+		grep -m3 "Parsed_idet" /tmp/idet.out >/tmp/idet.grep
+		idetneither=$(sed -n 1,1p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f7)
+		idettop=$(sed -n 1,1p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f9)
+		idetbottom=$(sed -n 1,1p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f11)
+		idetsftff=$(sed -n 2,2p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f8)
+		idetsfbff=$(sed -n 2,2p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f10)
+		idetsfprog=$(sed -n 2,2p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f12)
+		idetsfundet=$(sed -n 2,2p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f14)
+		idetmftff=$(sed -n 3,3p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f8)
+		idetmfbff=$(sed -n 3,3p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f10)
+		idetmfprog=$(sed -n 3,3p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f12)
+		idetmfundet=$(sed -n 3,3p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f14)
+
+		echo "Non-repeating Frames: $idetneither" |tee -a "$logfile"
+		echo "Top Fields: $idettop" |tee -a "$logfile"
+		echo "Bottom Fields: $idetbottom" |tee -a "$logfile"
+		echo "TFF: $idetsftff, $idetmftff"
+		echo "BFF: $idetsfbff, $idetmfbff"
+		echo "Progressive: $idetsfprog, $idetmfprog"
+		echo "Undetermined: $idetsfundet, $idetsfundet"
+
+		case "$idettop" in
+			''|*[!0-9]*) idettop=0 ;;
     		*) ;;
 		esac
-		case "$botrep" in
-			''|*[!0-9]*) botrep=0 ;;
+		case "$idetbottom" in
+			''|*[!0-9]*) idetbottom=0 ;;
     		*) ;;
 		esac
-		intlfields=$((toprep + botrep))
-		progfields=$((inframes - intlfields))
+		htcfields=$((idettop + idetbottom))
+		pcthtc=$(echo "($htcfields / $inframes) * 100" |bc -l)
+
+		idetsfintl=$(echo "$idetsftff + $idetsfbff" |bc -l)
+		idetmfintl=$(echo "$idetmftff + $idetmfbff" |bc -l)
+		idetallintl=$(echo "$idetsfintl + $idetmfintl" |bc -l)
+		intlfields=$(echo "$idetallintl / 2" |bc -l)
 		pctintl=$(echo "($intlfields / $inframes) * 100" |bc -l)
-		echo "Percent interlaced: $pctintl" |tee -a "$logfile"
+		echo "Interlaced match: $pctintl" |tee -a "$logfile"
+		echo "Telecine match: $pcthtc" |tee -a "$logfile"
 		echo
 	elif [ $ICHECK = 1 ]; then
 		echo "Counting interlaced frames in the output.  This takes a while."  |tee -a "$logfile"
@@ -709,7 +725,7 @@ function process {
 			nomfrate="30FPS"
 		fi
 	else
-		if [ "$(echo "$invres > 480" |bc -l)" -eq 1 ]; then
+		if [ "$invres" -eq "576" ]; then
 			standard="PAL"
 			if [ "$(echo "$infrate > 24.5" |bc -l)" -eq 1 ] && [ "$(echo "$infrate < 25.5" |bc -l)" -eq 1 ]; then
 				nomfrate="25FPS"
@@ -717,7 +733,7 @@ function process {
 				echo "ERROR: Unexpected PAL frame rate."
 				exit 1
 			fi
-		else
+		elif [ "$invres" -eq "480" ]; then
 			standard="NTSC"
 			if [ "$(echo "$infrate < 24.1" |bc -l)" -eq 1 ]; then
 				nomfrate="24FPS"
@@ -726,6 +742,9 @@ function process {
 			else
 				nomfrate="Mix"
 			fi
+		else
+			standard="UNKNOWN"
+			nomfrate="NA"
 		fi
 	fi
 	echo "Nominal Frame Rate: $nomfrate" |tee -a "$logfile"
@@ -738,7 +757,7 @@ function process {
 	# the threshold does correctly identify progressive and interlaced videos, even though the
 	# number does not really make any sense.
 		checkinterlace pre
-		if [ "$(echo "$pctintl <= 0.02" |bc -l)" -eq 1 ]; then
+		if [ "$(echo "$pctintl < 80" |bc -l)" -eq 1 ]; then
 			echo "Diagnosis: PAL progressive video at 25FPS." |tee -a "$logfile"
 			sleep 5; echo
 			if [ ! "$dryrun" = 1 ]; then
@@ -765,7 +784,15 @@ function process {
 		fi
 	elif [ "$nomfrate" == "30FPS" ]; then
 		checkinterlace pre
-		if [ "$(echo "$pctintl < $HTCTHRESH" |bc -l)" -eq 1 ]; then
+		if [ "$(echo "$pcthtc >= $HTCTHRESH" |bc -l)" -eq 1 ]; then
+			echo "Diagnosis: Hard telecined video at 24 FPS." |tee -a "$logfile"
+			sleep 5; echo
+			if [ ! "$dryrun" = 1 ]; then
+				hardtelecine
+			else
+				echo "$file: Hard Telecine 24FPS" >>diagreport.txt
+			fi
+		elif [ "$(echo "$pctintl > $INTLTHRESH" |bc -l)" -eq 1 ]; then
 			echo "Diagnosis: True, interlaced NTSC video at 30FPS." |tee -a "$logfile"
 			sleep 5; echo
 			if [ ! "$dryrun" == 1 ]; then
@@ -773,21 +800,20 @@ function process {
 			else
 				echo "$file: True Interlaced 30FPS" >>diagreport.txt
 			fi
-		elif [ "$(echo "$pctintl >= $INTLTHRESH" |bc -l)" -eq 1 ]; then
-			echo "Diagnosis: True, interlaced NTSC video at 30FPS." |tee -a "$logfile"
+		else
+			echo "Diagnosis: Mixed hard telecined and interlaced video." |tee -a "$logfile"
 			sleep 5; echo
 			if [ ! "$dryrun" = 1 ]; then
-				ntscinterlaced
+				if [ ! -f "${inname}.smap" ] && [ "$AUTOMAP" == 1 ]; then
+					"$MAPPER" "$file"
+				fi
+				mixed
 			else
-				echo "$file: True Interlaced 30FPS" >>diagreport.txt
-			fi
-		elif [ "$(echo "$pctintl >= $HTCTHRESH" |bc -l)" -eq 1 ]; then
-			echo "Diagnosis: Hard telecined video at 24 FPS." |tee -a "$logfile"
-			sleep 5; echo
-			if [ ! "$dryrun" = 1 ]; then
-				hardtelecine
-			else
-				echo "$file: Hard Telecine 24FPS" >>diagreport.txt
+				echo "$file: Mixed HTC+INTL" >>diagreport.txt
+				echo "$file" >>maplist.txt
+				if [ "$AUTOMAP" == 1 ]; then
+					"$MAPPER" "$file"
+				fi
 			fi
 		fi
 	elif [ "$nomfrate" == "Mix" ]; then
@@ -806,7 +832,10 @@ function process {
 			fi
 		fi
 	else
-		echo "ERROR: Bad match.  This is probably a bug." |tee -a "$logfile"
+		if [ "$dryrun" = 1 ]; then
+			echo "$file: Invalid video type" >>diagreport.txt
+		fi
+		echo "ERROR: This doesn't appear to be NTSC or PAL SD video." |tee -a "$logfile";echo
 	fi
 }
 
