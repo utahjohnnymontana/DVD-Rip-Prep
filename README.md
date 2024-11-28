@@ -124,38 +124,38 @@ You can do everything in one pass, but I don't really trust the scripts enough t
 
 1. Change to the directory that contains your MKV files.  
 
-cd myvideos/someTVshow/season1  
+> cd myvideos/someTVshow/season1  
 
 2. Make sure that AUTOMAP is set to 1 in the drp settings.  
 
 3. Do a dry run in batch mode.  
 
-drp -d  
+> drp -d  
 
 Or, if USERAMDISK is enabled in smap:  
 
-sudo drp -d  
+> sudo drp -d  
 
 4. Do a full run in batch mode.  
 
-drp  
+> drp  
 
 ##### Single file mode
 
 1. Change to the directory that contains your MKV files.  
 
-cd myvideos/someTVshow/season1  
+> cd myvideos/someTVshow/season1  
 
 2. Do a single file dry run.  
 
-drp -d episodeSxxExx.mkv  
+> drp -d episodeSxxExx.mkv  
 
 3. If the file is diagnosed as "Mixed Methods," run smap on it.  
 
-smap episodeSxxExx.mkv  
+> smap episodeSxxExx.mkv  
 
 4. Run drp in conversion mode.  
 
-drp episodeSxxExx.mkv  
+> drp episodeSxxExx.mkv  
 
 
