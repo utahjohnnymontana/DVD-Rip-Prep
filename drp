@@ -1,5 +1,5 @@
 #!/bin/bash
-# drp (DVD Rip Prep) bash script - Nov. 27 2024
+# drp (DVD Rip Prep) bash script - Nov. 28 2024
 #
 # This script attempts to take an MKV file produced by MakeMKV from a DVD source
 # and output a new file without telecine or interlacing and at the correct frame
@@ -46,7 +46,7 @@ ALLOWRTLOSS="0.001" # Fraction of runtime loss that is allowed (about 4s per hou
 # before wasting time upscaling them if they are out of sync.  It is safe to set
 # this to zero if you don't want to deal with the additional work.
 
-HTCTHRESH="5"
+HTCTHRESH="2.5"
 INTLTHRESH="50"
 # HTCTHRESH and INTLTHRESH define the percentage of frames that mark hard telecine
 # and true interlacing, respectively.

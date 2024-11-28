@@ -66,7 +66,7 @@ I'm sure that you are wondering why you would do manual mapping when the script 
 
 It is now also possible for the script to automatically generate segment maps.  This is an experimental procedure and it doesn't always work well.  If you have videos with relatively simple structures, like the example above in the Manual Mapping section, then it will probably be faster to make manual maps than to do it automatically.  However, if your video has many small segments, the automatic mapper is likely to do the job faster.
 
-Drp uses an accessory script, smap, to do the mapping.  If you have AUTOMAP enabled, then the whole process takes place automatically.  If AUTOMAP is disabled, which is the default setting, then you need to run the smap script on each file yourself (smap file).
+Drp uses an accessory script, smap, to do the mapping.  If you have AUTOMAP enabled, then the whole process takes place automatically.  If AUTOMAP is disabled, which is the default setting, then you need to run the smap script on each file yourself (smap file).  If you have AUTOMAP enabled in drp and USERAMDISK enabled in smap, then you should run drp with sudo.  Smap sets up and tears down a memory filesystem with every run and it needs root permissions to do that.  Without using sudo, smap will prompt for authentication on each run and will wait for you to come back and type your password.
 
 Smap divides the file into hundreds or thousands of short segments and analyzes each of those to determine where frame rate changes occur in the file.  It then outputs this data as a segment map file.  Once the segment map file has been created, you can run drp normally and it will use the map file.
 
@@ -115,5 +115,47 @@ You can run them through bash, like 'bash drp' or 'bash smap', but if you want t
 | smap file | Single file mode - it will create a segment map for the named file. |
 
 There are settings at the top of each script file that you can change.  They are explained in the comments.
+
+#### Workflow
+
+You can do everything in one pass, but I don't really trust the scripts enough to do that.  The whole process takes so long that, if something goes wrong in the diagnostic phase, your script will grind away for hours for no reason.  So, I usually use a diagnostic pass followed by a conversion pass.  I recommend spending some time working with single files before trying out batch mode, since you will learn more by working through the individual steps.
+
+##### Batch mode
+
+1. Change to the directory that contains your MKV files.  
+
+cd myvideos/someTVshow/season1  
+
+2. Make sure that AUTOMAP is set to 1 in the drp settings.  
+
+3. Do a dry run in batch mode.  
+
+drp -d  
+
+Or, if USERAMDISK is enabled in smap:  
+
+sudo drp -d  
+
+4. Do a full run in batch mode.  
+
+drp  
+
+##### Single file mode
+
+1. Change to the directory that contains your MKV files.  
+
+cd myvideos/someTVshow/season1  
+
+2. Do a single file dry run.  
+
+drp -d episodeSxxExx.mkv  
+
+3. If the file is diagnosed as "Mixed Methods," run smap on it.  
+
+smap episodeSxxExx.mkv  
+
+4. Run drp in conversion mode.  
+
+drp episodeSxxExx.mkv  
 
 

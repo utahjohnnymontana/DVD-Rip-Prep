@@ -1,12 +1,12 @@
 #!/bin/bash
-# smap (Segment Mapper) bash script - Nov. 27 2024
+# smap (Segment Mapper) bash script - Nov. 28 2024
 #
 # This script attempts to analyze an MKV file produced by MakeMKV from a DVD 
 # source and find where the original frame rates change in the video.  It
 # then creates a time map that drp can use to process the MKV.
 
 # Settings
-MINSEG="1"
+MINSEG="2"
 # Segments of less than 1 second duration are usually false positives.
 
 USERAMDISK=0
@@ -71,12 +71,15 @@ function makesegs {
 
 function getstandard {
 	invres=$(ffprobe -v error -select_streams v -show_entries stream=height -of default=noprint_wrappers=1:nokey=1 00000.mkv)
-	if [ "$invres" -gt "480" ]; then
+	if [ "$invres" -eq "576" ]; then
 		standard="PAL"
 		echo "Trying PAL frame rate analysis.  This is not reliable."
-	else
+	elif [ "$invres" -eq "480" ]; then
 		standard="NTSC"
 		echo "Trying NTSC frame rate analysis."
+	else
+		standard="UNKNOWN"
+		echo "ERROR: This doesn't appear to be NTSC or PAL SD video."
 	fi
 }
 
@@ -105,6 +108,10 @@ function getfratesntsc {
 		prevdurs=$(ffprobe -v error -select_streams v -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$prevfile")
 		prevframes=$(ffprobe -v error -select_streams v -count_packets -show_entries stream=nb_read_packets -of csv=p=0 "$prevfile" |head -n 1)
 		prevfrate=$(echo "$prevframes / $prevdurs" |bc -l)
+
+		if [ "$prevfrate" == "" ]; then
+			prevfrate="$curfrate"
+		fi
 
 		cumtime=$(echo "$cumtime + $curdurs" |bc -l)
 
