@@ -343,7 +343,6 @@ function hardtelecine {
 		-vf "fieldmatch,decimate,bwdif=mode=send_field:deint=interlaced" \
 		-r 24000/1001 \
 		-c:v ffv1 "$outfile"
-	checkinterlace
 	checkduration
 }
 
@@ -365,7 +364,6 @@ function htc2di {
 		-vf "mpdecimate" \
 		-r 24000/1001 \
 		-c:v ffv1 "$outfile"
-	checkinterlace
 	checkduration
 }
 
@@ -406,7 +404,6 @@ function softtelecine {
 		-an -sn \
 		-r 24000/1001 \
 		-c:v ffv1 "$outfile"
-	checkinterlace
 	checkduration
 }
 
