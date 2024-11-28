@@ -77,7 +77,7 @@ FIXRATE=1
 # a better approach.  2 is always the lossless approach, but 120 FPS videos
 # might not play on everything.
 
-AUTOMAP=0
+AUTOMAP=1
 # If enabled, run the segment mapper in batch mode.  If disabled, you will need
 # to run smap on mixed files manually.  Default is disabled because mapping is
 # a slow and resource intensive process.
@@ -88,54 +88,16 @@ MAPPER="$(dirname "$0")/smap"
 # to meet different requirements.  All that it needs to do is accept a file 
 # name as input and output a segment map file.
 
-OUTDIR="~" # Set to your output directory (default is home dir)
+OUTDIR="/home/bill/data/2process" # Set to your output directory (default is home dir)
 TEMPDIR="$OUTDIR/00DRP"
 LOGDIR="$TEMPDIR/LOGS"
 STEP1DIR="$TEMPDIR/STEP1"
 STEP2DIR="$TEMPDIR/STEP2"
 STEP3DIR="$TEMPDIR/STEP3"
+PRELOG="$LOGDIR/prelog"
 # End of settings
 
 function setup {
-	echo "Reporting settings..."
-	if [ "$WRITELOGS" = 1 ]; then
-		echo "Logging is enabled."
-	else
-		echo "Logging is disabled"
-	fi
-	if [ "$CONVPAL" = 1 ]; then
-		echo "PAL conversion is enabled."
-	else
-		echo "PAL conversion is disabled"
-	fi
-	if [ "$ICHECK" = 1 ]; then
-		echo "Post process interlace counting is enabled."
-	else
-		echo "Post process interlace counting is disabled"
-	fi
-	if [ "$OUTPUTJOIN" = 1 ]; then
-		echo "Outputting rejoined video is enabled."
-	else
-		echo "Outputting rejoined video is disabled."
-	fi
-	if [ "$OUTPUTSEGS" = 1 ]; then
-		echo "Outputting unjoined segments is enabled."
-	else
-		echo "Outputting unjoined segments is disabled."
-	fi
-	if [ "$MERGEMKV" = 1 ]; then
-		echo "Merging output with the original MKV is enabled."
-	else
-		echo "Merging output with the original MKV is disabled"
-	fi
-	if [ "$AUTOMAP" = 1 ]; then
-		echo "Automatic mapping is enabled, using $MAPPER."
-	else
-		echo "Automatic mapping is disabled"
-	fi
-	if [ "$dryrun" = 1 ]; then
-		echo "Doing a dry run..."
-	fi
 	echo "Checking dependencies..."
 	if ! command -v mediainfo >/dev/null 2>&1; then
 		echo "ERROR: Can't find mediainfo."
@@ -171,6 +133,54 @@ function setup {
 	fi
 }
 
+function reportsettings {
+	echo "Reporting settings..."
+	if [ "$WRITELOGS" = 1 ]; then
+		echo "Logging is enabled." |tee -a "$PRELOG"
+	else
+		echo "Logging is disabled" |tee -a "$PRELOG"
+	fi
+	if [ "$CONVPAL" = 1 ]; then
+		echo "PAL conversion is enabled." |tee -a "$PRELOG"
+	else
+		echo "PAL conversion is disabled" |tee -a "$PRELOG"
+	fi
+	if [ "$ICHECK" = 1 ]; then
+		echo "Post process interlace counting is enabled." |tee -a "$PRELOG"
+	else
+		echo "Post process interlace counting is disabled" |tee -a "$PRELOG"
+	fi
+	if [ "$OUTPUTJOIN" = 1 ]; then
+		echo "Outputting rejoined video is enabled." |tee -a "$PRELOG"
+	else
+		echo "Outputting rejoined video is disabled." |tee -a "$PRELOG"
+	fi
+	if [ "$OUTPUTSEGS" = 1 ]; then
+		echo "Outputting unjoined segments is enabled." |tee -a "$PRELOG"
+	else
+		echo "Outputting unjoined segments is disabled." |tee -a "$PRELOG"
+	fi
+	if [ "$MERGEMKV" = 1 ]; then
+		echo "Merging output with the original MKV is enabled." |tee -a "$PRELOG"
+	else
+		echo "Merging output with the original MKV is disabled" |tee -a "$PRELOG"
+	fi
+	if [ "$AUTOMAP" = 1 ]; then
+		echo "Automatic mapping is enabled, using $MAPPER." |tee -a "$PRELOG"
+	else
+		echo "Automatic mapping is disabled" |tee -a "$PRELOG"
+	fi
+	if [ "$dryrun" = 1 ]; then
+		echo "Doing a dry run..." |tee -a "$PRELOG"
+	fi
+	echo "OUTDIR is $OUTDIR" |tee -a "$PRELOG"
+	echo "TEMPDIR is $TEMPDIR" |tee -a "$PRELOG"
+	echo "LOGDIR is $LOGDIR" |tee -a "$PRELOG"
+	echo "STEP1DIR is $STEP1DIR" |tee -a "$PRELOG"
+	echo "STEP2DIR is $STEP2DIR" |tee -a "$PRELOG"
+	echo "STEP3DIR is $STEP3DIR" |tee -a "$PRELOG"
+}
+
 function cleanup {
 	echo "Cleaning up from previous run..."
 	if [ -d "$TEMPDIR" ] && [ "$dryrun" != 1 ]; then
@@ -179,18 +189,18 @@ function cleanup {
 			rm -f * >/dev/null 2>&1
 		fi
 	fi
-	#if [ -d "$STEP1DIR" ] && [ "$dryrun" != 1 ]; then
-	#	cd "$STEP1DIR" || exit 1
-	#	if [ "$(pwd)" == "$STEP1DIR" ]; then
-	#		rm -f * >/dev/null 2>&1
-	#	fi
-	#fi
-	#if [ -d "$STEP2DIR" ] && [ "$dryrun" != 1 ]; then
-	#	cd "$STEP2DIR" || exit 1
-	#	if [ "$(pwd)" == "$STEP2DIR" ]; then
-	#		rm -f * >/dev/null 2>&1
-	#	fi
-	#fi
+	if [ -d "$STEP1DIR" ] && [ "$dryrun" != 1 ]; then
+		cd "$STEP1DIR" || exit 1
+		if [ "$(pwd)" == "$STEP1DIR" ]; then
+			rm -f * >/dev/null 2>&1
+		fi
+	fi
+	if [ -d "$STEP2DIR" ] && [ "$dryrun" != 1 ]; then
+		cd "$STEP2DIR" || exit 1
+		if [ "$(pwd)" == "$STEP2DIR" ]; then
+			rm -f * >/dev/null 2>&1
+		fi
+	fi
 	if [ -d "$STEP3DIR" ] && [ "$dryrun" != 1 ]; then
 		cd "$STEP3DIR" || exit 1
 		if [ "$(pwd)" == "$STEP3DIR" ]; then
@@ -666,6 +676,9 @@ function process {
 	if [ $WRITELOGS = 1 ] && [ "$dryrun" != 1 ]; then
 		logfile="$LOGDIR/${inname}.${logtime}.log"
 		echo "Logging to: $logfile"
+		if [ -f "$PRELOG" ]; then
+			cat "$PRELOG" >"$logfile"
+		fi
 	else
 		logfile="/dev/null"
 	fi
@@ -722,7 +735,6 @@ function process {
 				palprogressive
 			else
 				echo "$file: PAL Progressive 25FPS" >>diagreport.txt
-				echo "Exiting dry run." |tee -a "$logfile"
 			fi
 		else
 			echo "Diagnosis: PAL interlaced video at 25FPS." |tee -a "$logfile"
@@ -731,7 +743,6 @@ function process {
 				palinterlaced
 			else
 				echo "$file: PAL Interlaced 25FPS" >>diagreport.txt
-				echo "Exiting dry run." |tee -a "$logfile"
 			fi
 		fi
 	elif [ "$nomfrate" == "24FPS" ]; then
@@ -741,7 +752,6 @@ function process {
 			softtelecine
 		else
 			echo "$file: Soft Telecine 24FPS" >>diagreport.txt
-			echo "Exiting dry run." |tee -a "$logfile"
 		fi
 	elif [ "$nomfrate" == "30FPS" ]; then
 		checkinterlace pre
@@ -752,7 +762,6 @@ function process {
 				softtelecine
 			else
 				echo "$file: Misdetected Soft Telecine 24FPS" >>diagreport.txt
-				echo "Exiting dry run." |tee -a "$logfile"
 			fi
 		elif [ "$(echo "$pctintl >= $INTLTHRESH" |bc -l)" -eq 1 ]; then
 			echo "Diagnosis: True, interlaced NTSC video at 30FPS." |tee -a "$logfile"
@@ -761,7 +770,6 @@ function process {
 				ntscinterlaced
 			else
 				echo "$file: True Interlaced 30FPS" >>diagreport.txt
-				echo "Exiting dry run." |tee -a "$logfile"
 			fi
 		elif [ "$(echo "$pctintl >= $HTCTHRESH" |bc -l)" -eq 1 ]; then
 			echo "Diagnosis: Hard telecined video at 24 FPS." |tee -a "$logfile"
@@ -770,7 +778,6 @@ function process {
 				hardtelecine
 			else
 				echo "$file: Hard Telecine 24FPS" >>diagreport.txt
-				echo "Exiting dry run." |tee -a "$logfile"
 			fi
 		fi
 	elif [ "$nomfrate" == "Mix" ]; then
@@ -787,7 +794,6 @@ function process {
 			if [ "$AUTOMAP" == 1 ]; then
 				"$MAPPER" "$file"
 			fi
-			echo "Exiting dry run." |tee -a "$logfile"
 		fi
 	else
 		echo "ERROR: Bad match.  This is probably a bug." |tee -a "$logfile"
@@ -814,12 +820,13 @@ if [ "$dryrun" = 1 ]; then
 	STEP2DIR="/dev/null"
 	STEP3DIR="/dev/null"
 fi
+setup
+reportsettings
 if [ "$file" != "" ]; then
 	if [ -f "$file" ]; then
 		echo "--------------------------------------------------"
 		echo "Starting drp run."
 		cleanup
-		setup
 		infile="$file"
 		step=1
 		process
@@ -836,7 +843,6 @@ else
 			echo "--------------------------------------------------"
 			echo "Starting drp run."
 			cleanup
-			setup
 			infile="$file"
 			step=1
 			process
