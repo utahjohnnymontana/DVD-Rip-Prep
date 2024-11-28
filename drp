@@ -20,13 +20,6 @@ CONVPAL=1 # Set to 0 to disable PAL conversions
 # alternate audio or sub tracks that need to be matched to the slower frame rate,
 # you can use the strech function in MKVToolnix with a value of 1.042708289.
 
-ICHECK=0 # Set to 1 to enable post process interlacing counts
-# Post process interlacing counts are slow and no longer as useful as they were when
-# I was first experimenting.  You might want to enable these if you are doing big
-# unattended batches and don't care about the extra time, or if you encounter videos
-# that the script doesn't match well.  In my experience, this is only going to catch
-# a small fraction of results that slightly miss the progressive threshold.
-
 PROGTHRESH="0.993" # Goal for fraction of non-interlaced frames
 # I find that it is usually better to tolerate some interlaced frames than to get
 # every last one.  ~1% interlaced frames is usually invisible to me.  They are most
@@ -144,11 +137,6 @@ function reportsettings {
 		echo "PAL conversion is enabled." |tee -a "$PRELOG"
 	else
 		echo "PAL conversion is disabled" |tee -a "$PRELOG"
-	fi
-	if [ "$ICHECK" = 1 ]; then
-		echo "Post process interlace counting is enabled." |tee -a "$PRELOG"
-	else
-		echo "Post process interlace counting is disabled" |tee -a "$PRELOG"
 	fi
 	if [ "$OUTPUTJOIN" = 1 ]; then
 		echo "Outputting rejoined video is enabled." |tee -a "$PRELOG"
@@ -357,17 +345,6 @@ function hardtelecine {
 		-c:v ffv1 "$outfile"
 	checkinterlace
 	checkduration
-	if [ $ICHECK = 1 ]; then
-		if [ "$(echo "$ifratio2 < $PROGTHRESH" |bc -l)" -eq 1 ]; then
-			echo "Interlaced frames in the output file exceed the threshold, so running again as mixed." |tee -a "$logfile"
-			mixed
-		elif [ "$(echo "$outdiff > $timeloss" |bc -l)" -eq 1 ]; then
-			echo "Duration difference exceeds threshold, so running again as mixed." |tee -a "$logfile";echo
-			mixed
-		else
-			echo "Fraction of non-interlaced frames is now greater than the threshold of $PROGTHRESH." |tee -a "$logfile"
-		fi
-	fi
 }
 
 function htc2di {
@@ -390,17 +367,6 @@ function htc2di {
 		-c:v ffv1 "$outfile"
 	checkinterlace
 	checkduration
-	if [ $ICHECK = 1 ]; then
-		if [ "$(echo "$ifratio2 < $PROGTHRESH" |bc -l)" -eq 1 ]; then
-			echo "Interlaced frames in the output file exceed the threshold, so running again as mixed." |tee -a "$logfile"
-			mixed
-		elif [ "$(echo "$outdiff > $timeloss" |bc -l)" -eq 1 ]; then
-			echo "Duration difference exceeds threshold, so running again as mixed." |tee -a "$logfile";echo
-			mixed
-		else
-			echo "Fraction of non-interlaced frames is now greater than the threshold of $PROGTHRESH." |tee -a "$logfile"
-		fi
-	fi
 }
 
 function mixed {
@@ -442,17 +408,6 @@ function softtelecine {
 		-c:v ffv1 "$outfile"
 	checkinterlace
 	checkduration
-	if [ $ICHECK = 1 ]; then
-		if [ "$(echo "$ifratio2 < $PROGTHRESH" |bc -l)" -eq 1 ]; then
-			echo "Interlaced frames in the output file exceed the threshold, so running again as mixed." |tee -a "$logfile"
-			mixed
-		elif [ "$(echo "$outdiff > $timeloss" |bc -l)" -eq 1 ]; then
-			echo "Duration difference exceeds threshold, so running again as mixed." |tee -a "$logfile";echo
-			mixed
-		else
-			echo "Fraction of non-interlaced frames is now greater than the threshold of $PROGTHRESH." |tee -a "$logfile"
-		fi
-	fi
 }
 
 function runsegments {
@@ -621,79 +576,54 @@ function ntscinterlaced {
 }
 
 function checkinterlace {
-	if [ "$1" == "pre" ]; then
-		echo "Counting interlaced frames in the input.  This takes a while."  |tee -a "$logfile"
-		ffmpeg -an -sn \
-			-hide_banner \
-			-stats \
-			-filter:v idet \
-			-f null - \
-			-i "$file" 2>"/tmp/idet.out"
-		grep -m3 "Parsed_idet" /tmp/idet.out >/tmp/idet.grep
-		idetneither=$(sed -n 1,1p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f7)
-		idettop=$(sed -n 1,1p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f9)
-		idetbottom=$(sed -n 1,1p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f11)
-		idetsftff=$(sed -n 2,2p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f8)
-		idetsfbff=$(sed -n 2,2p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f10)
-		idetsfprog=$(sed -n 2,2p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f12)
-		idetsfundet=$(sed -n 2,2p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f14)
-		idetmftff=$(sed -n 3,3p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f8)
-		idetmfbff=$(sed -n 3,3p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f10)
-		idetmfprog=$(sed -n 3,3p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f12)
-		idetmfundet=$(sed -n 3,3p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f14)
+	echo "Counting interlaced frames.  This takes a while."  |tee -a "$logfile"
+	ffmpeg -an -sn \
+		-hide_banner \
+		-stats \
+		-filter:v idet \
+		-f null - \
+		-i "$file" 2>"/tmp/idet.out"
+	grep -m3 "Parsed_idet" /tmp/idet.out >/tmp/idet.grep
+	idetneither=$(sed -n 1,1p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f7)
+	idettop=$(sed -n 1,1p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f9)
+	idetbottom=$(sed -n 1,1p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f11)
+	idetsftff=$(sed -n 2,2p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f8)
+	idetsfbff=$(sed -n 2,2p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f10)
+	idetsfprog=$(sed -n 2,2p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f12)
+	idetsfundet=$(sed -n 2,2p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f14)
+	idetmftff=$(sed -n 3,3p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f8)
+	idetmfbff=$(sed -n 3,3p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f10)
+	idetmfprog=$(sed -n 3,3p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f12)
+	idetmfundet=$(sed -n 3,3p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f14)
 
-		echo "Non-repeating Frames: $idetneither" |tee -a "$logfile"
-		echo "Top Fields: $idettop" |tee -a "$logfile"
-		echo "Bottom Fields: $idetbottom" |tee -a "$logfile"
-		echo "TFF: $idetsftff, $idetmftff"
-		echo "BFF: $idetsfbff, $idetmfbff"
-		echo "Progressive: $idetsfprog, $idetmfprog"
-		echo "Undetermined: $idetsfundet, $idetsfundet"
+	echo "Non-repeating Frames: $idetneither" |tee -a "$logfile"
+	echo "Top Fields: $idettop" |tee -a "$logfile"
+	echo "Bottom Fields: $idetbottom" |tee -a "$logfile"
+	echo "TFF: $idetsftff, $idetmftff"
+	echo "BFF: $idetsfbff, $idetmfbff"
+	echo "Progressive: $idetsfprog, $idetmfprog"
+	echo "Undetermined: $idetsfundet, $idetsfundet"
 
-		case "$idettop" in
-			''|*[!0-9]*) idettop=0 ;;
-    		*) ;;
-		esac
-		case "$idetbottom" in
-			''|*[!0-9]*) idetbottom=0 ;;
-    		*) ;;
-		esac
-		htcfields=$((idettop + idetbottom))
-		pcthtc=$(echo "($htcfields / $inframes) * 100" |bc -l)
+	case "$idettop" in
+		''|*[!0-9]*) idettop=0 ;;
+   		*) ;;
+	esac
+	case "$idetbottom" in
+		''|*[!0-9]*) idetbottom=0 ;;
+   		*) ;;
+	esac
+	htcfields=$((idettop + idetbottom))
+	pcthtc=$(echo "($htcfields / $inframes) * 100" |bc -l)
 
-		idetsfintl=$(echo "$idetsftff + $idetsfbff" |bc -l)
-		idetmfintl=$(echo "$idetmftff + $idetmfbff" |bc -l)
-		idetallintl=$(echo "$idetsfintl + $idetmfintl" |bc -l)
-		intlfields=$(echo "$idetallintl / 2" |bc -l)
-		pctintl=$(echo "($intlfields / $inframes) * 100" |bc -l)
-		echo "Interlaced match: $pctintl" |tee -a "$logfile"
-		echo "Telecine match: $pcthtc" |tee -a "$logfile"
-		echo
-	elif [ $ICHECK = 1 ]; then
-		echo "Counting interlaced frames in the output.  This takes a while."  |tee -a "$logfile"
-		idetout2=$(ffmpeg -an -filter:v idet -f null - -i "$outfile" 2>&1 |grep -m1 "Parsed_idet")
-		inframes2=$(mediainfo --Inform='Video;%FrameCount%' "$outfile")
-		echo "Frame Count: $inframes2" |tee -a "$logfile"
-		nonrep2=$(echo "$idetout2" |tr -d '[:alpha:]' |tr -d ' ' |cut -d: -f3)
-		echo "Non-repeating Frames: $nonrep2" |tee -a "$logfile"
-		toprep2=$(echo "$idetout2" |tr -d '[:alpha:]' |tr -d ' ' |cut -d: -f4)
-		echo "Top Fields: $toprep2" |tee -a "$logfile"
-		botrep2=$(echo "$idetout2" |tr -d '[:alpha:]' |tr -d ' ' |cut -d: -f5)
-		echo "Bottom Fields: $botrep2" |tee -a "$logfile"
-		case "$toprep2" in
-			''|*[!0-9]*) toprep2=0 ;;
-    		*) ;;
-		esac
-		case "$botrep2" in
-			''|*[!0-9]*) botrep2=0 ;;
-    		*) ;;
-		esac
-		intlfields2=$((toprep2 + botrep2))
-		progfields2=$((inframes2 - intlfields2))
-		pctintl=$(echo "($intlfields / $inframes) * 100" |bc -l)
-		echo "Percent interlaced: $pctintl" |tee -a "$logfile"
-		echo
-	fi			
+	idetsfintl=$(echo "$idetsftff + $idetsfbff" |bc -l)
+	idetmfintl=$(echo "$idetmftff + $idetmfbff" |bc -l)
+	idetallintl=$(echo "$idetsfintl + $idetmfintl" |bc -l)
+	intlfields=$(echo "$idetallintl / 2" |bc -l)
+	pctintl=$(echo "($intlfields / $inframes) * 100" |bc -l)
+	echo "Interlaced match: $pctintl" |tee -a "$logfile"
+	echo "Telecine match: $pcthtc" |tee -a "$logfile"
+	echo
+	
 }
 
 function process {
@@ -756,7 +686,7 @@ function process {
 	# encoded as progressive.  With the small number of PAL discs in my collection, using 99.8% as
 	# the threshold does correctly identify progressive and interlaced videos, even though the
 	# number does not really make any sense.
-		checkinterlace pre
+		checkinterlace
 		if [ "$(echo "$pctintl < 80" |bc -l)" -eq 1 ]; then
 			echo "Diagnosis: PAL progressive video at 25FPS." |tee -a "$logfile"
 			sleep 5; echo
@@ -783,7 +713,7 @@ function process {
 			echo "$file: Soft Telecine 24FPS" >>diagreport.txt
 		fi
 	elif [ "$nomfrate" == "30FPS" ]; then
-		checkinterlace pre
+		checkinterlace
 		if [ "$(echo "$pcthtc >= $HTCTHRESH" |bc -l)" -eq 1 ]; then
 			echo "Diagnosis: Hard telecined video at 24 FPS." |tee -a "$logfile"
 			sleep 5; echo
