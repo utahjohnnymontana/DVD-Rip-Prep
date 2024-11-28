@@ -25,7 +25,7 @@ ICHECK=0 # Set to 1 to enable post process interlacing counts
 # I was first experimenting.  You might want to enable these if you are doing big
 # unattended batches and don't care about the extra time, or if you encounter videos
 # that the script doesn't match well.  In my experience, this is only going to catch
-# a small fraction of results that slightly miss the progressive threshhold.
+# a small fraction of results that slightly miss the progressive threshold.
 
 PROGTHRESH="0.993" # Goal for fraction of non-interlaced frames
 # I find that it is usually better to tolerate some interlaced frames than to get
@@ -46,10 +46,20 @@ ALLOWRTLOSS="0.001" # Fraction of runtime loss that is allowed (about 4s per hou
 # before wasting time upscaling them if they are out of sync.  It is safe to set
 # this to zero if you don't want to deal with the additional work.
 
-HTCTHRESH="7"
+HTCTHRESH="1"
 INTLTHRESH="26"
 # HTCTHRESH and INTLTHRESH define the percentage of frames that mark hard telecine
 # and true interlacing, respectively.
+# Idet gives results that seem pretty weird to me, but after extensive testing, I
+# have found that most true interlaced video counts out as under 1% interlaced or
+# occasionally greater than 30%.  Everything that falls in between 1 and 26
+# percent appears to be hard telecined or a combination of hard telecine with some
+# interlacing, which the hard telecine method handles by following inverse
+# telecine with a deinterlace on marked frames.  The range between 1 and 6 percent
+# is often associated with interlacing applied over the top of telecined content
+# or perhaps vice versa.  Might need more fine tuning here.
+# Why does idet find more interlaced frames in hard telecined video than fully
+# interlaced video?  Maybe I am using it wrong.
 
 OUTPUTJOIN=1
 OUTPUTSEGS=0
@@ -359,13 +369,13 @@ function hardtelecine {
 	checkduration
 	if [ $ICHECK = 1 ]; then
 		if [ "$(echo "$ifratio2 < $PROGTHRESH" |bc -l)" -eq 1 ]; then
-			echo "Interlaced frames in the output file exceed the threshhold, so running again as mixed." |tee -a "$logfile"
+			echo "Interlaced frames in the output file exceed the threshold, so running again as mixed." |tee -a "$logfile"
 			mixed
 		elif [ "$(echo "$outdiff > $timeloss" |bc -l)" -eq 1 ]; then
-			echo "Duration difference exceeds threshhold, so running again as mixed." |tee -a "$logfile";echo
+			echo "Duration difference exceeds threshold, so running again as mixed." |tee -a "$logfile";echo
 			mixed
 		else
-			echo "Fraction of non-interlaced frames is now greater than the threshhold of $PROGTHRESH." |tee -a "$logfile"
+			echo "Fraction of non-interlaced frames is now greater than the threshold of $PROGTHRESH." |tee -a "$logfile"
 		fi
 	fi
 }
@@ -392,13 +402,13 @@ function htc2di {
 	checkduration
 	if [ $ICHECK = 1 ]; then
 		if [ "$(echo "$ifratio2 < $PROGTHRESH" |bc -l)" -eq 1 ]; then
-			echo "Interlaced frames in the output file exceed the threshhold, so running again as mixed." |tee -a "$logfile"
+			echo "Interlaced frames in the output file exceed the threshold, so running again as mixed." |tee -a "$logfile"
 			mixed
 		elif [ "$(echo "$outdiff > $timeloss" |bc -l)" -eq 1 ]; then
-			echo "Duration difference exceeds threshhold, so running again as mixed." |tee -a "$logfile";echo
+			echo "Duration difference exceeds threshold, so running again as mixed." |tee -a "$logfile";echo
 			mixed
 		else
-			echo "Fraction of non-interlaced frames is now greater than the threshhold of $PROGTHRESH." |tee -a "$logfile"
+			echo "Fraction of non-interlaced frames is now greater than the threshold of $PROGTHRESH." |tee -a "$logfile"
 		fi
 	fi
 }
@@ -444,13 +454,13 @@ function softtelecine {
 	checkduration
 	if [ $ICHECK = 1 ]; then
 		if [ "$(echo "$ifratio2 < $PROGTHRESH" |bc -l)" -eq 1 ]; then
-			echo "Interlaced frames in the output file exceed the threshhold, so running again as mixed." |tee -a "$logfile"
+			echo "Interlaced frames in the output file exceed the threshold, so running again as mixed." |tee -a "$logfile"
 			mixed
 		elif [ "$(echo "$outdiff > $timeloss" |bc -l)" -eq 1 ]; then
-			echo "Duration difference exceeds threshhold, so running again as mixed." |tee -a "$logfile";echo
+			echo "Duration difference exceeds threshold, so running again as mixed." |tee -a "$logfile";echo
 			mixed
 		else
-			echo "Fraction of non-interlaced frames is now greater than the threshhold of $PROGTHRESH." |tee -a "$logfile"
+			echo "Fraction of non-interlaced frames is now greater than the threshold of $PROGTHRESH." |tee -a "$logfile"
 		fi
 	fi
 }
@@ -725,10 +735,10 @@ function process {
 	# frames with PAL, even when I can clearly see that the video is interlaced.  I don't know if
 	# this is because idet works poorly with PAL or if PAL DVDs are often interlaced video that is
 	# encoded as progressive.  With the small number of PAL discs in my collection, using 99.8% as
-	# the threshhold does correctly identify progressive and interlaced videos, even though the
+	# the threshold does correctly identify progressive and interlaced videos, even though the
 	# number does not really make any sense.
 		checkinterlace pre
-		if [ "$(echo "$pctintl <= 1" |bc -l)" -eq 1 ]; then
+		if [ "$(echo "$pctintl <= 0.02" |bc -l)" -eq 1 ]; then
 			echo "Diagnosis: PAL progressive video at 25FPS." |tee -a "$logfile"
 			sleep 5; echo
 			if [ ! "$dryrun" = 1 ]; then
