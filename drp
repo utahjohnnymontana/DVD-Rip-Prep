@@ -88,7 +88,7 @@ MAPPER="$(dirname "$0")/smap"
 # to meet different requirements.  All that it needs to do is accept a file 
 # name as input and output a segment map file.
 
-OUTDIR="/home/bill/data/2process" # Set to your output directory (default is home dir)
+OUTDIR="~" # Set to your output directory (default is home dir)
 TEMPDIR="$OUTDIR/00DRP"
 LOGDIR="$TEMPDIR/LOGS"
 STEP1DIR="$TEMPDIR/STEP1"
@@ -189,18 +189,18 @@ function cleanup {
 			rm -f * >/dev/null 2>&1
 		fi
 	fi
-	#if [ -d "$STEP1DIR" ] && [ "$dryrun" != 1 ]; then
-	#	cd "$STEP1DIR" || exit 1
-	#	if [ "$(pwd)" == "$STEP1DIR" ]; then
-	#		rm -f * >/dev/null 2>&1
-	#	fi
-	#fi
-	#if [ -d "$STEP2DIR" ] && [ "$dryrun" != 1 ]; then
-	#	cd "$STEP2DIR" || exit 1
-	#	if [ "$(pwd)" == "$STEP2DIR" ]; then
-	#		rm -f * >/dev/null 2>&1
-	#	fi
-	#fi
+	if [ -d "$STEP1DIR" ] && [ "$dryrun" != 1 ]; then
+		cd "$STEP1DIR" || exit 1
+		if [ "$(pwd)" == "$STEP1DIR" ]; then
+			rm -f * >/dev/null 2>&1
+		fi
+	fi
+	if [ -d "$STEP2DIR" ] && [ "$dryrun" != 1 ]; then
+		cd "$STEP2DIR" || exit 1
+		if [ "$(pwd)" == "$STEP2DIR" ]; then
+			rm -f * >/dev/null 2>&1
+		fi
+	fi
 	if [ -d "$STEP3DIR" ] && [ "$dryrun" != 1 ]; then
 		cd "$STEP3DIR" || exit 1
 		if [ "$(pwd)" == "$STEP3DIR" ]; then
