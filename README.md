@@ -83,6 +83,8 @@ The script is best at converting single method videos.  It can do the following 
 
 These conversions should give you a file with a consistent frame rate, and no introduced stutters, that can be processed in TVAI without resorting to an interlaced method.
 
+By default, the script outputs files in the FFV1 format, which is lossless.  That means that the file sizes can be pretty large, usually at least five times the size of the MKV you started with.  Keep that in mind when batch processing.  The scripts do not currently check available disk space, although I should probably add that.
+
 Mixed method conversion is still a work in progress.  It works a lot of the time, but it doesn't work at all for some combinations.  This is a very slow process - the more segments, the longer it takes.  Figure that the processing time for a video with more than 10 segments will be at least twice the runtime of the video, so two hours for every hour of video.  The more segments, the longer it will take, because ffmpeg has to read from the beginning to the segment start every time.
 
 The script now creates a temp directory named 00DRP that contains log files and subdirectories for the output of all the intermediate steps.  If you find that a video didn't complete, check the log files and you are bound to discover that one of the segments needs adjustment.
@@ -124,38 +126,40 @@ You can do everything in one pass, but I don't really trust the scripts enough t
 
 1. Change to the directory that contains your MKV files.  
 
-> cd myvideos/someTVshow/season1  
+>> cd myvideos/someTVshow/season1  
 
 2. Make sure that AUTOMAP is set to 1 in the drp settings.  
 
 3. Do a dry run in batch mode.  
 
-> drp -d  
+>> drp -d  
 
 Or, if USERAMDISK is enabled in smap:  
 
-> sudo drp -d  
+>> sudo drp -d  
 
-4. Do a full run in batch mode.  
+4. Take a look at diagreport.txt and make sure that the diagnoses seem realistic.  
 
-> drp  
+5. Do a full run in batch mode.  
+
+>> drp  
 
 ##### Single file mode
 
 1. Change to the directory that contains your MKV files.  
 
-> cd myvideos/someTVshow/season1  
+>> cd myvideos/someTVshow/season1  
 
 2. Do a single file dry run.  
 
-> drp -d episodeSxxExx.mkv  
+>> drp -d episodeSxxExx.mkv  
 
 3. If the file is diagnosed as "Mixed Methods," run smap on it.  
 
-> smap episodeSxxExx.mkv  
+>> smap episodeSxxExx.mkv  
 
 4. Run drp in conversion mode.  
 
-> drp episodeSxxExx.mkv  
+>> drp episodeSxxExx.mkv  
 
 
