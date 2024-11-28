@@ -56,7 +56,7 @@ start,00:02:00
 00:48:00,end  
 
 This is an example of a very common pattern in TV shows that have overlayed titles and credits but no CGI effects.  This would look like a two minute intro, followed by two minutes of overlayed titles and major credits, followed by the 44 minute body of the episode, followed by the end credits.  You have to account for the full run of the video - no gaps.  Start and end are special times, since the script can get the first and last frame number automatically.  You should try to get as close as possible to the time where the segment 
-changes.  If you are lucky, your videos will only have a few segments, but I have tested the script successfully with as many as thirty three.
+changes.  If you are lucky, your videos will only have a few segments, but I have tested the script successfully with as many as thirty-three.
 
 If you have identified the segments correctly, the script will apply the appropriate technique to each segment and output a rejoined video that still syncs up with the audio.  If you got it wrong, then the audio will be out of sync.  That is a sign that you either need to tighten up the segment times or look for an additional segment (maybe a special effects sequence) that you missed.
 
@@ -103,8 +103,8 @@ The two scripts, drp and smap, are just bash scripts and can be installed anywhe
 
 You can run them through bash, like 'bash drp' or 'bash smap', but if you want to run them directly as commands, then you will need to make them executable:
 
-'chmod +x drp'  
-'chmod +x smap'  
+> chmod +x drp  
+> chmod +x smap  
 
 ### Usage
 
@@ -124,42 +124,42 @@ You can do everything in one pass, but I don't really trust the scripts enough t
 
 ##### Batch mode
 
-1. Change to the directory that contains your MKV files.  
+Change to the directory that contains your MKV files.  
 
->> cd myvideos/someTVshow/season1  
+> cd myvideos/someTVshow/season1  
 
-2. Make sure that AUTOMAP is set to 1 in the drp settings.  
+Make sure that AUTOMAP is set to 1 in the drp settings.  
 
-3. Do a dry run in batch mode.  
+Do a dry run in batch mode.  
 
->> drp -d  
+> drp -d  
 
 Or, if USERAMDISK is enabled in smap:  
 
->> sudo drp -d  
+> sudo drp -d  
 
-4. Take a look at diagreport.txt and make sure that the diagnoses seem realistic.  
+Take a look at diagreport.txt and make sure that the diagnoses seem realistic.  
 
-5. Do a full run in batch mode.  
+Do a full run in batch mode.  
 
->> drp  
+> drp  
 
 ##### Single file mode
 
-1. Change to the directory that contains your MKV files.  
+Change to the directory that contains your MKV files.  
 
->> cd myvideos/someTVshow/season1  
+> cd myvideos/someTVshow/season1  
 
-2. Do a single file dry run.  
+Do a single file dry run.  
 
->> drp -d episodeSxxExx.mkv  
+> drp -d episodeSxxExx.mkv  
 
-3. If the file is diagnosed as "Mixed Methods," run smap on it.  
+If the file is diagnosed as "Mixed Methods," run smap on it.  
 
->> smap episodeSxxExx.mkv  
+> smap episodeSxxExx.mkv  
 
-4. Run drp in conversion mode.  
+Run drp in conversion mode.  
 
->> drp episodeSxxExx.mkv  
+> drp episodeSxxExx.mkv  
 
 
