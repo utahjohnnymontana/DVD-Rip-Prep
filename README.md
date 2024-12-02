@@ -81,7 +81,7 @@ The script is best at converting single method videos.  It can do the following 
 * Convert 30FPS interlaced video to 30FPS progressive video  
 * Convert 25FPS PAL (interlaced or progressive) to 24FPS progressive video  
 
-These conversions should give you a file with a consistent frame rate, and no introduced stutters, that can be processed in TVAI without resorting to an interlaced method.
+These conversions should give you a file with a consistent frame rate, and no introduced stutters, that can be processed in TVAI without resorting to an interlaced method.  It is worth noting that the aim of this script is not perfection.  Except for soft telecined and progressive content, it will probably never produce a result that does not contain a single interlaced frame.  They are going to continue to lurk in the transitions and in sequences of fast motion where ffmpeg cannot find a good match, but the occasional interlaced frame is usually going to go unnoticed in casual viewing and it is not worth the extra effort that would be required to eliminate them.
 
 By default, the script outputs files in the FFV1 format, which is lossless.  That means that the file sizes can be pretty large, usually at least five times the size of the MKV you started with.  Keep that in mind when batch processing.  The scripts do not currently check available disk space, although I should probably add that.
 

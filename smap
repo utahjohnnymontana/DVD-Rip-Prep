@@ -1,15 +1,30 @@
 #!/bin/bash
-# smap (Segment Mapper) bash script - Nov. 28 2024
+# smap (Segment Mapper) bash script - Nov. 29 2024
 #
 # This script attempts to analyze an MKV file produced by MakeMKV from a DVD 
 # source and find where the original frame rates change in the video.  It
-# then creates a time map that drp can use to process the MKV.
+# then creates a segment map that drp can use to process the MKV.
 
 # Settings
-MINSEG="2"
-# Segments of less than 1 second duration are usually false positives.
+SEGSIZE="0.1"
+# How finely should the script slice the video for analysis?  A segment 
+# time of 0.1 effectively instructs ffmpeg to make the smallest possible 
+# segments.  Usually, the smallest that ffmpeg will produce is about 1/2 
+# second.  Small values will catch brief, but real, transitions at the 
+# cost of significantly increased processing time.  Whether those short 
+# segments exist in the content you are analyzing is uncertain and whether 
+# or not you care about potentially missing a few interlaced frames is a 
+# matter of preference.  If your video has no short segments, you can set 
+# this to something like 10, 30, or even 60 and get much faster runs.  
 
-USERAMDISK=0
+MINSEG="1"
+# Segments shorter than MINSEG will be ignored.  Very short segments may 
+# be false positives or inconsequential parts like black screen transitions 
+# that will lose nothing as a result of dropped frames.  There is no right 
+# answer when it comes to this setting.  0.5 is the shortest practical 
+# setting and should catch just about everything.
+
+USERAMDISK=1
 # If enabled, the script will create an 8GB tmpfs memory filesystem.  This will 
 # consume 8GB of RAM for the duration that the script runs, so you probably 
 # wouldn't want to do this on a system that has less than 16GB of RAM.  
@@ -17,19 +32,19 @@ USERAMDISK=0
 # Because this script writes out thousands of files per analysis, using a
 # memory filesystem seems like a good idea.  Writing lots of small files over
 # and over might accelerate disk wear.  This is disabled by default, but if you
-# have the RAM, I strongly recommend enabling it.
+# have the RAM, I recommend enabling it.
 #
 # If the script crashes or you break out of it, you will need to manually
 # unmount the filesystem.
 
-OUTDIR="~" # Set to your output directory (default is home dir)
+OUTDIR="/home/bill/data/2process" # Set to your output directory (default is home dir)
 TEMPDIR="$OUTDIR/00DRP"
 LOGDIR="$TEMPDIR/LOGS"
 SEGDIR="$TEMPDIR/segments"
 # End of settings
 
 function setup {
-	echo "Setting up directories and cleaning up from previous run."
+	echo "Setting up directories and cleaning up from previous run..."
 	if [ ! -d "$TEMPDIR" ]; then
 		mkdir "$TEMPDIR" || exit 1
 	fi
@@ -39,8 +54,8 @@ function setup {
 	if [ ! -d "$SEGDIR" ]; then
 		mkdir "$SEGDIR" || exit 1
 	else
-		cd "$SEGDIR"
-		if [ $(pwd) == "$SEGDIR" ]; then
+		cd "$SEGDIR" || exit 1
+		if [ "$(pwd)" == "$SEGDIR" ]; then
 			rm -f *
 		fi
 	fi
@@ -58,13 +73,11 @@ function setup {
 }
 
 function makesegs {
-	echo "Dividing the input file into minimum time segments.  This is slow."
-	# The segment time of 0.1 effectively instructs ffmpeg to make the smallest
-	# possible segments.  Usually, the smallest it can go is about 1/2 second.
+	echo "Dividing the input file into minimum time segments..."
 	ffmpeg -an -sn \
 		-i "$infile" \
 		-f segment \
-		-segment_time 0.1 \
+		-segment_time "$SEGSIZE" \
 		-reset_timestamps 1 \
 		-c:v copy "$SEGDIR/%05d.mkv"
 }
@@ -84,7 +97,7 @@ function getstandard {
 }
 
 function getfratesntsc {
-	echo "Getting the frame rate of each segment file.  This can take a long time."
+	echo "Getting the frame rate of each segment file..."
 	for file in $(ls -1 *.mkv); do
 		curfile="$file"
 		filenum=$(echo "$curfile" |cut -d. -f1)
@@ -117,7 +130,7 @@ function getfratesntsc {
 
 		if [ "$(echo "$curfrate < 25" |bc -l)" -eq 1 ]; then
 			nomfrate="24FPS"
-		elif [ "$(echo "$curfrate > 28" |bc -l)" -eq 1 ]; then
+		elif [ "$(echo "$curfrate > 29" |bc -l)" -eq 1 ]; then
 			nomfrate="30FPS"
 		else
 			# Frame rate is not diagnostic, so compare it to previous and next
@@ -130,10 +143,10 @@ function getfratesntsc {
 				nomfrate="30FPS"
 			# Mid point between 24 and 30 FPS
 			elif [ "$(echo "$curfrate <= 27" |bc -l)" -eq 1 ] && [ "$(echo "$prevfrate < 27" |bc -l)" -eq 1 ] && [ "$(echo "$nextfrate > 27" |bc -l)" -eq 1 ]; then
-				nomrate="30FPS"
+				nomfrate="30FPS"
 			# Mid point between 30 and 24 FPS
 			elif [ "$(echo "$curfrate >= 27" |bc -l)" -eq 1 ] && [ "$(echo "$prevfrate > 27" |bc -l)" -eq 1 ] && [ "$(echo "$nextfrate < 27" |bc -l)" -eq 1 ]; then
-				nomrate="24FPS"
+				nomfrate="24FPS"
 			fi
 		fi
 
@@ -143,7 +156,7 @@ function getfratesntsc {
 }
 
 function getfratespal {
-	echo "Getting the frame rate of each segment file.  This can take a long time."
+	echo "Getting the frame rate of each segment file..."
 	for file in $(ls -1 *.mkv); do
 		echo "Working on $file"
 		curfile="$file"
@@ -180,16 +193,13 @@ function getfratespal {
 			nomfrate="Mix"
 		fi
 
-		echo "${curfile},${curdurs},${cumtime},${curframes},${curfrate},${nomfrate}" >>"$rawreportfile"
-		if [ "$nomfrate" != "Mix" ]; then
-		    echo "${line}:${curfile},${curdurs},${cumtime},${curframes},${curfrate},${nomfrate}" >>"$reportfile"
-			line=$((line + 1))
-		fi
+	    echo "${line}:${curfile},${curdurs},${cumtime},${curframes},${curfrate},${nomfrate}" >>"$reportfile"
+		line=$((line + 1))
 	done
 }
 
 function gettrans {
-	echo "Now finding every segment that appears to represent a frame rate transition."
+	echo "Finding segments that enclose frame rate transitions..."
 	transfile="$infilename.trans"
 	if [ -f "$transfile" ]; then
 		rm -f "$transfile" || exit 1
@@ -204,53 +214,119 @@ function gettrans {
 	done
 }
 
-function makemapfile {
-	echo -n "start," >"$mapfile"
+function refinetrans {
+	tempmap="$SEGDIR/temp.smap"
+	maxmap="$SEGDIR/max.smap"
+	mapfile="$rundir/$infilename.smap"
+	cumtime=0
+	echo "Making fine adjustments to the transition points..."
 	for line in $(cat "$transfile"); do
 		grep -C1 "$line" "$reportfile" >triplet.txt
-		# Refine the transition time
-		echo "Experimental time adjustment begins here."
-		nomfratetop=$(sed -n 1,1p triplet.txt|cut -d, -f6)
-		nomfratemid=$(sed -n 2,2p triplet.txt|cut -d, -f6)
-		nomfratebot=$(sed -n 3,3p triplet.txt|cut -d, -f6)
-		echo "$nomfratetop, $nomfratemid, $nomfratebot"
+		durstop=$(sed -n 1,1p triplet.txt|cut -d, -f2)
+		dursmid=$(sed -n 2,2p triplet.txt|cut -d, -f2)
+		dursbot=$(sed -n 3,3p triplet.txt|cut -d, -f2)
+		#echo "durs: $durstop, $dursmid, $dursbot"
+		cumtimetop=$(sed -n 1,1p triplet.txt|cut -d, -f3)
+		cumtimemid=$(sed -n 2,2p triplet.txt|cut -d, -f3)
+		cumtimebot=$(sed -n 3,3p triplet.txt|cut -d, -f3)
+		#echo "cumtime: $cumtimetop, $cumtimemid, $cumtimebot"
+		nomfratetop=$(sed -n 1,1p triplet.txt|cut -d, -f6 |cut -dF -f1)
+		nomfratemid=$(sed -n 2,2p triplet.txt|cut -d, -f6 |cut -dF -f1)
+		nomfratebot=$(sed -n 3,3p triplet.txt|cut -d, -f6 |cut -dF -f1)
+		#echo "nomfrate: $nomfratetop, $nomfratemid, $nomfratebot"
 		truefratetop=$(sed -n 1,1p triplet.txt|cut -d, -f5)
 		truefratemid=$(sed -n 2,2p triplet.txt|cut -d, -f5)
 		truefratebot=$(sed -n 3,3p triplet.txt|cut -d, -f5)
-		echo "$truefratetop, $truefratemid, $truefratebot"
-		dursmid=$(sed -n 2,2p triplet.txt|cut -d, -f2)
-		ratediff="$(echo "$truefratemid - 23.976" |bc -l)"
-		difffrac="$(echo "$ratediff / 5.99" |bc -l)"
-		timeadj="$(echo "$dursmid * $difffrac" |bc -l)"
-		echo "$dursmid, $ratediff, $difffrac, $timeadj"
+		#echo "truefrate: $truefratetop, $truefratemid, $truefratebot"
+		fratedifftop="$(echo "$truefratetop - $nomfratetop" |bc -l)"
+		fratediffmid="$(echo "$truefratemid - $nomfratemid" |bc -l)"
+		fratediffbot="$(echo "$truefratebot - $nomfratebot" |bc -l)"
+		#echo "fratediff: $fratedifftop, $fratediffmid, $fratediffbot"
+		if [ "$(echo "$fratedifftop < 0" |bc -l)" -eq 1 ]; then
+			absdifftop="$(echo "$fratedifftop * -1" |bc -l)"
+		else
+			absdifftop="$fratedifftop"
+		fi
+		if [ "$(echo "$fratediffmid < 0" |bc -l)" -eq 1 ]; then
+			absdiffmid="$(echo "$fratediffmid * -1" |bc -l)"
+		else
+			absdiffmid="$fratediffmid"
+		fi
+		if [ "$(echo "$fratediffbot < 0" |bc -l)" -eq 1 ]; then
+			absdiffbot="$(echo "$fratediffbot * -1" |bc -l)"
+		else
+			absdiffbot="$fratediffbot"
+		fi
+		#echo "absdiff: $absdifftop, $absdiffmid, $absdiffbot"
+		# Which segment is really transitional?
+		if [ "$(echo "$absdifftop > $absdiffmid" |bc -l)" -eq 1 ] && [ "$(echo "$absdifftop > $absdiffbot" |bc -l)" -eq 1 ]; then
+			duration="$durstop"
+			truefrate="$truefratetop"
+			cumtime="$cumtimetop"
+			#echo "top"
+		elif [ "$(echo "$absdiffmid > $absdifftop" |bc -l)" -eq 1 ] && [ "$(echo "$absdiffmid > $absdiffbot" |bc -l)" -eq 1 ]; then
+			duration="$dursmid"
+			truefrate="$truefratemid"
+			cumtime="$cumtimemid"
+			#echo "mid"
+		else
+			duration="$dursbot"
+			truefrate="$truefratebot"
+			cumtime="$cumtimebot"
+			#echo "bot"
+		fi
+		#echo "$duration, $truefrate, $cumtime"
+		# Adjust the time at the transitional segment
+		ratediff="$(echo "$truefrate - 23.976" |bc -l)"
+		#echo "ratediff: $ratediff"
+		if [ "$(echo "$ratediff < 0" |bc -l)" -eq 1 ]; then
+			difffrac=0
+		else
+			difffrac="$(echo "$ratediff / 5.99" |bc -l)"
+		fi
+		#echo "diffrac: $difffrac"
+		timeadj="$(echo "$duration * $difffrac" |bc -l)"
+		#echo "timeadj: $timeadj"
 		if [ "$(echo "$nomfratetop > $nomfratebot" |bc -l)" -eq 1 ]; then
 			# 30 to 24
-			modadj="$timeadj"
+			modadj="$(echo "$duration - $timeadj" |bc -l)"
 		else
 			# 24 to 30
-			modadj="$(echo "$dursmid - $timeadj" |bc -l)"
+			modadj="$timeadj"
 		fi
-		echo "$modadj"
-
-		cumtime=$(echo "$line" |cut -d, -f3 |cut -d, -f1)
+		#echo "modadj: $modadj"
 		cumtimefinal="$(echo "$cumtime - $modadj" |bc -l)"
-		echo "$cumtime, $cumtimefinal"
-		evenodd=$((count % 2))
-		cumtimediff="$(echo "$cumtimefinal - $prevcumtime" |bc -l)"
-		if [ "$(echo "$cumtimediff >= $MINSEG" |bc -l)" -eq 1 ]; then
-			if [ "$evenodd" = 0 ]; then
-				echo "$cumtimefinal" >>"$mapfile"
-				echo -n "$cumtimefinal," >>"$mapfile"
-			else
-				echo "$cumtimefinal" >>"$mapfile"
-				echo -n "$cumtimefinal," >>"$mapfile"
-			fi
-			count=$((count + 1))
-			prevcumtime="$cumtimefinal"
+		#echo "$cumtime, $cumtimefinal"
+		echo "$cumtimefinal" >>"$tempmap"
+		#echo "Experimental time adjustment ends here."
+	done
+}
+
+function makemap {
+	# Drop short segments and write the maxedlist
+	prevtime=0
+	# Apply MINSEG to tempmap
+	touch "$maxmap"
+	for time in $(cat "$tempmap"); do
+		timediff="$(echo "$time - $prevtime" |bc -l)"
+		if [ "$(echo "$timediff >= $MINSEG" |bc -l)" -eq 1 ]; then
+			echo "$time" >>"$maxmap"
+		else
+			sed -i '$d' "$maxmap"
 		fi
-		echo "Experimental time adjustment ends here."
+		prevtime="$time"
+	done
+
+	# Build the segmap from the maxedlist
+	echo -n "start," >"$mapfile"
+	for time in $(cat "$maxmap"); do
+		echo "$time" >>"$mapfile"
+		echo -n "$time," >>"$mapfile"
 	done
 	echo "end" >>"$mapfile"
+	if [ "$SUDO_USER" ]; then
+		chown "$SUDO_USER" "$mapfile"
+	fi
 }
 
 IFS=$'\n'
@@ -264,6 +340,7 @@ if [ ! -f "$infile" ]; then
 	exit 1
 fi
 
+timein="$(date +%s)"
 setup
 makesegs
 
@@ -274,22 +351,19 @@ cumtime=0
 line=0
 reportfile="$infilename.rates"
 filecount=$(($(ls -1 *.mkv |wc -l) - 1))
-
 if [ "$standard" == "NTSC" ]; then
 	getfratesntsc
 else
-	getratespal
+	getfratespal
 fi
 
 gettrans
+refinetrans
+makemap
 
-cumtime=0
-count=2
-max="$(wc -l <$transfile)"
-prevcumtime=0
-mapfile="$rundir/$infilename.smap"
-
-makemapfile
+timeout="$(date +%s)"
+runtime=$((timeout - timein))
+echo "Segment mapper completed analysis in $runtime seconds."
 
 if [ "$USERAMDISK" == 1 ]; then
 	cd "$rundir"
