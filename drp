@@ -1,5 +1,5 @@
 #!/bin/bash
-# drp (DVD Rip Prep) bash script - Nov. 29 2024
+# drp (DVD Rip Prep) bash script - Dec. 1 2024
 #
 # This script attempts to take an MKV file produced by MakeMKV from a DVD source
 # and output a new file without telecine or interlacing and at the correct frame
@@ -70,7 +70,7 @@ FIXRATE=1
 # a better approach.  2 is always the lossless approach, but 120 FPS videos
 # might not play on everything.
 
-AUTOMAP=1
+AUTOMAP=0
 # If enabled, run the segment mapper in batch mode.  If disabled, you will need
 # to run smap on mixed files manually.  Default is disabled because mapping is
 # a slow and resource intensive process.
@@ -81,7 +81,7 @@ MAPPER="$(dirname "$0")/smap"
 # to meet different requirements.  All that it needs to do is accept a file 
 # name as input and output a segment map file.
 
-OUTDIR="/home/bill/data/2process" # Set to your output directory (default is home dir)
+OUTDIR="~" # Set to your output directory (default is home dir)
 TEMPDIR="$OUTDIR/00DRP"
 LOGDIR="$TEMPDIR/LOGS"
 STEP1DIR="$TEMPDIR/STEP1"

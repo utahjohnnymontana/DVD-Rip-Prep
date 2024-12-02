@@ -1,5 +1,5 @@
 #!/bin/bash
-# smap (Segment Mapper) bash script - Nov. 29 2024
+# smap (Segment Mapper) bash script - Dec. 1 2024
 #
 # This script attempts to analyze an MKV file produced by MakeMKV from a DVD 
 # source and find where the original frame rates change in the video.  It
@@ -24,7 +24,7 @@ MINSEG="1"
 # answer when it comes to this setting.  0.5 is the shortest practical 
 # setting and should catch just about everything.
 
-USERAMDISK=1
+USERAMDISK=0
 # If enabled, the script will create an 8GB tmpfs memory filesystem.  This will 
 # consume 8GB of RAM for the duration that the script runs, so you probably 
 # wouldn't want to do this on a system that has less than 16GB of RAM.  
@@ -37,7 +37,7 @@ USERAMDISK=1
 # If the script crashes or you break out of it, you will need to manually
 # unmount the filesystem.
 
-OUTDIR="/home/bill/data/2process" # Set to your output directory (default is home dir)
+OUTDIR="~" # Set to your output directory (default is home dir)
 TEMPDIR="$OUTDIR/00DRP"
 LOGDIR="$TEMPDIR/LOGS"
 SEGDIR="$TEMPDIR/segments"
