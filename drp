@@ -1,5 +1,5 @@
 #!/bin/bash
-# drp (DVD Rip Prep) bash script - Dec. 1 2024
+# drp (DVD Rip Prep) bash script - Dec. 3 2024
 #
 # This script attempts to take an MKV file produced by MakeMKV from a DVD source
 # and output a new file without telecine or interlacing and at the correct frame
@@ -92,12 +92,12 @@ PRELOG="$LOGDIR/prelog"
 
 function setup {
 	echo "Checking dependencies..."
-	if ! command -v mediainfo >/dev/null 2>&1; then
-		echo "ERROR: Can't find mediainfo."
-		exit 1
-	fi
 	if ! command -v ffmpeg >/dev/null 2>&1; then
 		echo "ERROR: Can't find ffmpeg."
+		exit 1
+	fi
+	if ! command -v ffprobe >/dev/null 2>&1; then
+		echo "ERROR: Can't find ffprobe."
 		exit 1
 	fi
 	if ! command -v mkvmerge >/dev/null 2>&1; then
@@ -195,53 +195,43 @@ function cleanup {
 			rm -f * >/dev/null 2>&1
 		fi
 	fi
+	if [ -f /tmp/idet.out ]; then
+		rm -f /tmp/idet.out
+	fi
+	if [ -f /tmp/idet.grep ]; then
+		rm -f /tmp/idet.grep
+	fi
 	cd "$rundir" || exit 1
 }
 
 function checkduration {
-	if [ "$step" = 1 ] && [ -f "$outfile" ]; then
-		outdurs=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$outfile")
-		outdiff=$(echo "$indurs" - "$outdurs" |bc -l)
-		timeloss=0
-		if [ "$outdiff" = 0 ]; then
-			echo "Output duration matches input.  That's good." |tee -a "$logfile"	
-		else
-			echo "WARNING: Output and input durations do not match: $outdurs vs $indurs." |tee -a "$logfile"
-			echo "A difference of a few seconds often results in no observable difference, but you" |tee -a "$logfile"
-			echo "should check to make sure that the audio track still syncs up before wasting time" |tee -a "$logfile"
-			echo "on further processing." |tee -a "$logfile";echo
-			basename=$(echo "$outname"| cut -f1 -d.)
-			outname="${basename}-TIMEDIFF-${outdiff}sec.mkv"
-			refile=$OUTDIR/$outname
+	infileck="$1"
+	outfileck="$2"
+	indurck=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$infileck")
+	outdurck=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$outfileck")
+	rtdiff=$(echo "$indurck" - "$outdurck" |bc -l)
+	rtloss=0
+	if [ "$rtdiff" = 0 ]; then
+		echo "Output duration matches input.  That's good." |tee -a "$logfile"	
+	else
+		echo "WARNING: Output and input durations do not match: $outdurck vs $indurck." |tee -a "$logfile"
+		if [ "$step" == "1" ] || [ "$step" == "4" ]; then
+			basename=$(echo "$outfileck"| cut -f1 -d.)
+			rename="${basename}-TIMEDIFF-${rtdiff}sec.mkv"
+			refile="$rename"
 			mv "$outfile" "$refile"
-			timeloss=$(echo "$indurs * $ALLOWRTLOSS" |bc -l)
-		fi
-	elif [ "$step" = 4 ] && [ -f "$outfile" ] && [ -f "$rundir/$infile" ]; then
-		orgdurs=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$rundir/$infile")
-		outdurs=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$outfile")
-		outdiff=$(echo "$orgdurs" - "$outdurs" |bc -l)
-		timeloss=0
-		if [ "$outdiff" = 0 ]; then
-			echo "Output duration matches input.  That's good." |tee -a "$logfile"	
-		else
-			echo "WARNING: Output and input durations do not match: $outdurs vs $indurs." |tee -a "$logfile"
-			echo "A difference of a few seconds often results in no observable difference, but you" |tee -a "$logfile"
-			echo "should check to make sure that the audio track still syncs up before wasting time" |tee -a "$logfile"
-			echo "on further processing." |tee -a "$logfile";echo
-			#outname=""${inname}-rejoined-TIMEDIFF-${outdiff}sec.mkv"
-			#refile=$OUTDIR/$outname
-			#mv "$outfile" "$refile"
-			#timeloss=$(echo "$indurs * $ALLOWRTLOSS" |bc -l)
+			outfile="$refile"
 		fi
 	fi
+
 }
 
 function mergeinout {
 	inname="$(echo "$infile" |cut -d. -f1)"
 	mergename="${inname}-merged.mkv"
-	if [ -f "$outfile" ] && [ -f "$rundir/$infile" ] &&  [ "$segfail" != 1 ]  && [ "$dryrun" != 1 ]; then
+	if [ -f "$outfile" ] && [ -f "$rundir/$clifile" ] &&  [ "$segfail" != 1 ]  && [ "$dryrun" != 1 ]; then
 		echo "Merging with original file..." |tee -a "$logfile"
-		mkvmerge -o "$OUTDIR/$mergename" --track-name 0:"DRP Output" "$outfile" "$rundir/$infile"
+		mkvmerge -o "$OUTDIR/$mergename" --track-name 0:"DRP Output" "$outfile" "$rundir/$clifile"
 	fi
 	if [ "$SUDO_USER" ]; then
 		chown "$SUDO_USER" "$OUTDIR/$mergename"
@@ -332,7 +322,7 @@ function hardtelecine {
 	outname="${inname}-24fps-hdtc-ffv1.mkv"
 	if [ "$step" = 1 ]; then
 		outfile="$OUTDIR/$outname"
-	elif [ "$step" = 2 ]; then
+	elif [ "$step" = 3 ]; then
 		outfile="$STEP3DIR/$outname"
 	else
 		echo "ERROR: Input step does not make sense.  This is probably a bug."
@@ -346,14 +336,14 @@ function hardtelecine {
 		-vf "fieldmatch,decimate,bwdif=mode=send_field:deint=interlaced" \
 		-r 24000/1001 \
 		-c:v ffv1 "$outfile"
-	checkduration
+	checkduration "$file" "$outfile"
 }
 
 function htc2di {
 	outname="${inname}-24fps-htc2di-ffv1.mkv"
 	if [ "$step" = 1 ]; then
 		outfile="$OUTDIR/$outname"
-	elif [ "$step" = 2 ]; then
+	elif [ "$step" = 3 ]; then
 		outfile="$STEP3DIR/$outname"
 	else
 		echo "ERROR: Input step does not make sense.  This is probably a bug."
@@ -367,21 +357,20 @@ function htc2di {
 		-vf "mpdecimate" \
 		-r 24000/1001 \
 		-c:v ffv1 "$outfile"
-	checkduration
+	checkduration "$file" "$outfile"
 }
 
 function mixed {
 	outfile="$OUTDIR/$outname"
 	echo "The mixed method runs in four steps and takes a while to complete." |tee -a "$logfile"
 	if [ "$step" = 1 ] && [ "$dryrun" != 1 ]; then
-		prepsegments
 		step=2
-		runsegments
+		prepsegments
 		step=3
+		runsegments
+		step=4
 		segconcat
 		outputsegs
-		step=4
-		checkduration
 		segfail=0
 	elif [ "$step" -gt 1 ]; then
 		echo "ERROR: The frame rate indicates that the segment start and/or end times are off." |tee -a "$logfile"
@@ -394,7 +383,7 @@ function softtelecine {
 	outname="${inname}-24fps-sdtc-ffv1.mkv"
 	if [ "$step" = 1 ]; then
 		outfile="$OUTDIR/$outname"
-	elif [ "$step" = 2 ]; then
+	elif [ "$step" = 3 ]; then
 		outfile="$STEP3DIR/$outname"
 	else
 		echo "ERROR: Input step does not make sense.  This is probably a bug."
@@ -407,7 +396,7 @@ function softtelecine {
 		-an -sn \
 		-r 24000/1001 \
 		-c:v ffv1 "$outfile"
-	checkduration
+	checkduration "$file" "$outfile"
 }
 
 function runsegments {
@@ -415,7 +404,7 @@ function runsegments {
 	mkvcount=$(ls -1 *.mkv |wc -l)
 	if [ "$mkvcount" -ne 0 ]; then
 		echo "Running step 3 (processing segments)." |tee -a "$logfile"
-		for file in $(ls -1 *segment*); do
+		for file in $(ls -1 *segment*.mkv); do
 			if [ "$segfail" != 1 ]; then
 				process
 				echo "file '$outname'" >>"$STEP3DIR/concat.txt"
@@ -428,13 +417,12 @@ function runsegments {
 
 function segconcat {
 	if [ "$OUTPUTJOIN" == "1" ]; then
-		echo "Rejoining the segment files..."
+		echo "Running step 4 (rejoining segments)." |tee -a "$logfile"
 		inname="$(echo "$infile" |cut -d. -f1)"
 		outname="${inname}-rejoined.mkv"
 		outfile="$OUTDIR/$outname"
 		cd "$STEP3DIR" ||exit 1
 		if [ -f concat.txt ] && [ "$segfail" != 1 ]; then
-			echo "Running step 4 (rejoining segments)." |tee -a "$logfile"
 			ffmpeg -n \
 				-hide_banner \
 				-v warning \
@@ -446,6 +434,7 @@ function segconcat {
 		else
 			echo "ERROR: Unexpected concatenation failure."
 		fi
+		checkduration "$rundir/$clifile" "$outfile"
 	fi
 	if [ "$SUDO_USER" ]; then
 		chown "$SUDO_USER" "$outfile"
@@ -550,7 +539,7 @@ function ntscinterlaced {
 	outname="${inname}-30fps-deint-ffv1.mkv"
 	if [ "$step" = 1 ]; then
 		outfile="$OUTDIR/$outname"
-	elif [ "$step" = 2 ]; then
+	elif [ "$step" = 3 ]; then
 		outfile="$STEP3DIR/$outname"
 	else
 		echo "ERROR: Input step does not make sense.  This is probably a bug."
@@ -576,7 +565,7 @@ function ntscinterlaced {
 			-r 24000/1001 \
 			-c:v ffv1 "$outfile"
 	fi
-	checkduration
+	checkduration "$file" "$outfile"
 }
 
 function checkinterlace {
@@ -626,8 +615,6 @@ function checkinterlace {
 	pctintl=$(echo "($intlfields / $inframes) * 100" |bc -l)
 	echo "Interlaced match: $pctintl" |tee -a "$logfile"
 	echo "Telecine match: $pcthtc" |tee -a "$logfile"
-	echo
-	
 }
 
 function process {
@@ -652,7 +639,7 @@ function process {
 	invres=$(ffprobe -v error -select_streams v -show_entries stream=height -of default=noprint_wrappers=1:nokey=1 "$file")
 	echo "Vertical Resolution: $invres" |tee -a "$logfile"
 	echo "Calculated Frame Rate: $infrate" |tee -a "$logfile"
-	if [ "$step" == 2 ]; then
+	if [ "$step" == 3 ]; then
 		if [ "$(echo "$infrate < 27" |bc -l)" -eq 1 ]; then
 			nomfrate="24FPS"
 		else
@@ -734,6 +721,22 @@ function process {
 			else
 				echo "$file: True Interlaced 30FPS" >>diagreport.txt
 			fi
+		elif [ "$(echo "$pcthtc < 1" |bc -l)" -eq 1 ] && [ "$(echo "$pctintl < 1" |bc -l)" -eq 1 ]; then
+			echo "Diagnosis: Soft telecine with misleading frame rate." |tee -a "$logfile"
+			sleep 5; echo
+			if [ ! "$dryrun" == 1 ]; then
+				softtelecine
+			else
+				echo "$file: Soft telecine bad FPS" >>diagreport.txt
+			fi
+		elif [ "$(echo "$pcthtc < 1" |bc -l)" -eq 1 ] && [ "$(echo "$pctintl > 20" |bc -l)" -eq 1 ]; then
+			echo "Diagnosis: Soft telecined/interlaced border or transition." |tee -a "$logfile"
+			sleep 5; echo
+			if [ ! "$dryrun" == 1 ]; then
+				ntscinterlaced
+			else
+				echo "$file: Partially interlaced video" >>diagreport.txt
+			fi
 		else
 			echo "Diagnosis: Mixed hard telecined and interlaced video." |tee -a "$logfile"
 			sleep 5; echo
@@ -790,6 +793,7 @@ fi
 if [ "$1" != "-d" ] && [ "$1" != "" ]; then
 	file="$1"
 fi
+clifile="$file"
 if [ "$dryrun" = 1 ]; then
 	TEMPDIR="/dev/null"
 	LOGDIR="/dev/null"
@@ -832,7 +836,7 @@ else
 		echo "ERROR: No MKV files found."
 	fi
 fi
-if [ "$dryrun" != "1" ] && [ "$SUDO_USER" ]; then
+if [ "$dryrun" == "1" ] && [ "$SUDO_USER" ]; then
 	chown "$SUDO_USER" "$rundir/diagreport.txt"
 	chown "$SUDO_USER" "$rundir/maplist.txt"
 fi

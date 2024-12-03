@@ -1,5 +1,5 @@
 #!/bin/bash
-# smap (Segment Mapper) bash script - Dec. 1 2024
+# smap (Segment Mapper) bash script - Dec. 3 2024
 #
 # This script attempts to analyze an MKV file produced by MakeMKV from a DVD 
 # source and find where the original frame rates change in the video.  It
@@ -17,7 +17,7 @@ SEGSIZE="0.1"
 # matter of preference.  If your video has no short segments, you can set 
 # this to something like 10, 30, or even 60 and get much faster runs.  
 
-MINSEG="1"
+MINSEG="0.2"
 # Segments shorter than MINSEG will be ignored.  Very short segments may 
 # be false positives or inconsequential parts like black screen transitions 
 # that will lose nothing as a result of dropped frames.  There is no right 
@@ -60,6 +60,11 @@ function setup {
 		fi
 	fi
 	cd "$rundir" || exit 1
+if [ "$USERAMDISK" == 1 ]; then
+	cd "$rundir"
+	echo "Unmounting memory filesystem.  You may be prompted to authenticate if not root."
+	sudo umount "$SEGDIR"
+fi
 	if [ "$USERAMDISK" == 1 ]; then
 		mntstatus=$(grep "SEGDIR" /proc/mounts |cut -d' ' -f 3)
 		if [ "$mntstatus" == "tmpfs" ]; then
@@ -132,6 +137,13 @@ function getfratesntsc {
 			nomfrate="24FPS"
 		elif [ "$(echo "$curfrate > 29" |bc -l)" -eq 1 ]; then
 			nomfrate="30FPS"
+		elif [ "$filenum" -lt "1" ] && [ "$(echo "$curfrate < 26.5" |bc -l)" -eq 1 ]; then
+			nomfrate="24FPS"
+		elif [ "$filenum" -lt "1" ] && [ "$(echo "$curfrate >= 26.5" |bc -l)" -eq 1 ]; then
+			nomfrate="30FPS"
+		elif [ "$(echo "$curfrate > 35" |bc -l)" -eq 1 ] || [ "$(echo "$curfrate < 20" |bc -l)" -eq 1 ]; then
+			echo "ERROR: Frame rate out of range for DVD sourced video."
+			exit 1
 		else
 			# Frame rate is not diagnostic, so compare it to previous and next
 			# High point among marginal 24FPS
@@ -365,8 +377,4 @@ timeout="$(date +%s)"
 runtime=$((timeout - timein))
 echo "Segment mapper completed analysis in $runtime seconds."
 
-if [ "$USERAMDISK" == 1 ]; then
-	cd "$rundir"
-	echo "Unmounting memory filesystem.  You may be prompted to authenticate if not root."
-	sudo umount "$SEGDIR"
-fi
+
