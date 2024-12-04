@@ -1,5 +1,5 @@
 #!/bin/bash
-# smap (Segment Mapper) bash script - Dec. 3 2024
+# smap (Segment Mapper) bash script - Dec. 4 2024
 #
 # This script attempts to analyze an MKV file produced by MakeMKV from a DVD 
 # source and find where the original frame rates change in the video.  It
@@ -14,15 +14,16 @@ SEGSIZE="0.1"
 # cost of significantly increased processing time.  Whether those short 
 # segments exist in the content you are analyzing is uncertain and whether 
 # or not you care about potentially missing a few interlaced frames is a 
-# matter of preference.  If your video has no short segments, you can set 
-# this to something like 10, 30, or even 60 and get much faster runs.  
+# matter of preference.  If your video has no short segments, you can
+# increase the value for faster mapping.
 
 MINSEG="1"
 # Segments shorter than MINSEG will be ignored.  Very short segments may 
 # be false positives or inconsequential parts like black screen transitions 
 # that will lose nothing as a result of dropped frames.  There is no right 
 # answer when it comes to this setting.  0.5 is the shortest practical 
-# setting and should catch just about everything.
+# setting and should catch just about everything, but I've found that 1 is 
+# a better default.
 
 USERAMDISK=0
 # If enabled, the script will create an 8GB tmpfs memory filesystem.  This will 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# drp (DVD Rip Prep) bash script - Dec. 3 2024
+# drp (DVD Rip Prep) bash script - Dec. 4 2024
 #
 # This script attempts to take an MKV file produced by MakeMKV from a DVD source
 # and output a new file without telecine or interlacing and at the correct frame
@@ -93,6 +93,10 @@ function setup {
 	fi
 	if ! command -v mkvmerge >/dev/null 2>&1; then
 		echo "ERROR: Can't find mkvmerge."
+		exit 1
+	fi
+	if ! command -v bc >/dev/null 2>&1; then
+		echo "ERROR: Can't find bc."
 		exit 1
 	fi
 	echo "Checking directories..."
@@ -352,7 +356,9 @@ function hardtelecine {
 }
 
 function harddi {
-	# HardDI is potentially destructive and only gets called as a last resort
+	# HardDI is potentially destructive and only gets called as a last resort.
+	# Can't find the right pattern in this video, so just deinterlace it and 
+	# then drop frames that are very similar to hopfully correct motion.
 	outname="${inname}-24fps-harddi-ffv1.mkv"
 	if [ "$step" = 1 ]; then
 		outfile="$OUTDIR/$outname"
@@ -375,7 +381,7 @@ function harddi {
 
 function mixed {
 	outfile="$OUTDIR/$outname"
-	echo "The mixed method runs in four steps and takes a while to complete." |tee -a "$logfile"
+	echo;echo "The mixed method runs in four steps and takes a while to complete." |tee -a "$logfile"
 	if [ "$step" = 1 ] && [ "$dryrun" != 1 ]; then
 		step=2
 		prepsegments
@@ -416,7 +422,7 @@ function runsegments {
 	cd "$STEP2DIR" || exit 1
 	mkvcount=$(ls -1 *.mkv |wc -l)
 	if [ "$mkvcount" -ne 0 ]; then
-		echo "Running step 3 (processing segments)." |tee -a "$logfile"
+		echo;echo "Running step 3 (processing segments)." |tee -a "$logfile"
 		for file in $(ls -1 *segment*.mkv); do
 			if [ "$segfail" != 1 ]; then
 				process
@@ -430,7 +436,7 @@ function runsegments {
 
 function segconcat {
 	if [ "$OUTPUTJOIN" == "1" ]; then
-		echo "Running step 4 (rejoining segments)." |tee -a "$logfile"
+		echo;echo "Running step 4 (rejoining segments)." |tee -a "$logfile"
 		inname="$(echo "$infile" |cut -d. -f1)"
 		outname="${inname}-rejoined.mkv"
 		outfile="$OUTDIR/$outname"
@@ -698,12 +704,7 @@ function process {
 	echo "Nominal Frame Rate: $nomfrate" |tee -a "$logfile"
 
 	if [ "$nomfrate" == "25FPS" ]; then
-	# I have very low confidence in PAL diagnosis.  Idet does not seem to detect many interlaced
-	# frames with PAL, even when I can clearly see that the video is interlaced.  I don't know if
-	# this is because idet works poorly with PAL or if PAL DVDs are often interlaced video that is
-	# encoded as progressive.  With the small number of PAL discs in my collection, using 99.8% as
-	# the threshold does correctly identify progressive and interlaced videos, even though the
-	# number does not really make any sense.
+	# I have low confidence in PAL diagnosis.
 		checkinterlace
 		if [ "$(echo "$pctintl < 80" |bc -l)" -eq 1 ]; then
 			echo "Diagnosis: PAL progressive video at 25FPS." |tee -a "$logfile"
