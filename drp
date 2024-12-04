@@ -20,24 +20,15 @@ CONVPAL=1 # Set to 0 to disable PAL conversions
 # alternate audio or sub tracks that need to be matched to the slower frame rate,
 # you can use the strech function in MKVToolnix with a value of 1.042708289.
 
-PROGTHRESH="0.993" # Goal for fraction of non-interlaced frames
-# I find that it is usually better to tolerate some interlaced frames than to get
-# every last one.  ~1% interlaced frames is usually invisible to me.  They are most
-# likely to remain only in credit sequences and scene transitions.  You can set this
-# to 1, which will allow no interlaced frames, but the result will be to run just
-# about everything that is not pure progressive content through the mixed method,
-# which makes the script rather pointless.
-
-ALLOWRTLOSS="0.001" # Fraction of runtime loss that is allowed (about 4s per hour)
-# Runtime loss sounds bad, but is usually not noticeable when it is just a few
-# seconds.  That doesn't really make sense, but it has been my experience.  I think
-# that there is something wrong with the way that mediainfo counts or reports this
-# number, since the audio shouldn't sync up by the end of the video if it is off
-# at all.  The objective here is to not throw out a good hard detelecine result
-# and replace it with a mixed result that is likely to make more alterations.  Any
-# files that have a time difference are marked TIMEDIFF and you should check them
-# before wasting time upscaling them if they are out of sync.  It is safe to set
-# this to zero if you don't want to deal with the additional work.
+ALLOWLOSS="0.03" # Percent of runtime loss that is allowed (about 1s per hour)
+# The more invasive the method used by the script, the more likely that the runtime
+# of the video will change.  Usually, it ends up slightly shorter due to dropped
+# frames, but occasionally it will also run slightly longer.  In most cases, the
+# difference is small enough that it does not matter, but a big enough change will
+# result in audio that is out of sync.  Videos that lose more than ALLOWLOSS will
+# be renamed to indicate the time loss.  Also, segments that lose more than this
+# amount may be retried with an alternate method to see if it produces a better
+# result.
 
 HTCTHRESH="2.5"
 INTLTHRESH="50"
@@ -210,17 +201,24 @@ function checkduration {
 	indurck=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$infileck")
 	outdurck=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$outfileck")
 	rtdiff=$(echo "$indurck" - "$outdurck" |bc -l)
-	rtloss=0
-	if [ "$rtdiff" = 0 ]; then
-		echo "Output duration matches input.  That's good." |tee -a "$logfile"	
+	pctdiff=$(echo "($rtdiff" / "$indurck) * 100" |bc -l)
+	tryalt=0
+	if [ "$rtdiff" == "0" ]; then
+		echo "Output duration matches input.  That's good." |tee -a "$logfile"
+	elif [ "$(echo "$pctdiff <= $ALLOWLOSS" |bc -l)" -eq 1 ]; then
+		echo "Output duration is changed but within acceptable range: out $outdurck vs in $indurck" |tee -a "$logfile"
 	else
-		echo "WARNING: Output and input durations do not match: $outdurck vs $indurck." |tee -a "$logfile"
+		echo "WARNING: Output and input durations out of range: out $outdurck vs in $indurck" |tee -a "$logfile"
 		if [ "$step" == "1" ] || [ "$step" == "4" ]; then
 			basename=$(echo "$outfileck"| cut -f1 -d.)
 			rename="${basename}-TIMEDIFF-${rtdiff}sec.mkv"
 			refile="$rename"
 			mv "$outfile" "$refile"
 			outfile="$refile"
+		fi
+		if [ "$step" == "3" ]; then
+			echo "Trying alternate method for comparison..." |tee -a "$logfile"
+			tryalt=1
 		fi
 	fi
 
@@ -337,10 +335,25 @@ function hardtelecine {
 		-r 24000/1001 \
 		-c:v ffv1 "$outfile"
 	checkduration "$file" "$outfile"
+	if [ "$tryalt" -eq "1" ]; then
+		outnamea="$outname"
+		pctdiffa="$pctdiff"
+		harddi
+		pctdiffb="$pctdiff"
+		outnameb="$outname"
+		if [ "$(echo "$pctdiffb <= $ALLOWLOSS" |bc -l)" -eq 1 ]; then
+			echo "HardDI method produced an acceptable runtime loss.  Using it instead."
+			outname="$outnameb"
+		else
+			echo "HardDI method was not better than HDTC.  Keeping HDTC result." 
+			outname="$outnamea"
+		fi
+	fi
 }
 
-function htc2di {
-	outname="${inname}-24fps-htc2di-ffv1.mkv"
+function harddi {
+	# HardDI is potentially destructive and only gets called as a last resort
+	outname="${inname}-24fps-harddi-ffv1.mkv"
 	if [ "$step" = 1 ]; then
 		outfile="$OUTDIR/$outname"
 	elif [ "$step" = 3 ]; then
@@ -354,7 +367,7 @@ function htc2di {
 		-stats \
 		-i "$file" \
 		-an -sn \
-		-vf "mpdecimate" \
+		-vf "bwdif=mode=send_field:deint=all,mpdecimate=hi=200:lo=200:frac=1:max=0" \
 		-r 24000/1001 \
 		-c:v ffv1 "$outfile"
 	checkduration "$file" "$outfile"
@@ -566,10 +579,24 @@ function ntscinterlaced {
 			-c:v ffv1 "$outfile"
 	fi
 	checkduration "$file" "$outfile"
+	if [ "$tryalt" -eq "1" ]; then
+		outnamea="$outname"
+		pctdiffa="$pctdiff"
+		harddi
+		pctdiffb="$pctdiff"
+		outnameb="$outname"
+		if [ "$(echo "$pctdiffb <= $ALLOWLOSS" |bc -l)" -eq 1 ]; then
+			echo "HardDI method produced an acceptable runtime loss.  Using it instead."
+			outname="$outnameb"
+		else
+			echo "HardDI method was no better than regular DI.  Keeping DI result." 
+			outname="$outnamea"
+		fi
+	fi
 }
 
 function checkinterlace {
-	echo "Counting interlaced frames.  This takes a while."  |tee -a "$logfile"
+	echo "Counting interlaced frames..."  |tee -a "$logfile"
 	ffmpeg -an -sn \
 		-hide_banner \
 		-stats \
