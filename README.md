@@ -1,6 +1,6 @@
 # DVD Rip Prep
 
-DVD Rip Prep (drp) is a bash script that attempts to prepare an MKV file produced from a DVD by MakeMKV for upscaling.  It might also work with rips made with other software, but I have only tested MakeMKV rips.  It will probably not be of any use with other video files.  It only accepts NTSC or PAL SD video and that video ideally should not have been edited or reencoded since being ripped from DVD.
+DVD Rip Prep (drp) is a bash script that attempts to prepare an MKV file produced from a DVD by MakeMKV for upscaling.  It might also work with rips made with other software, but I have only tested MakeMKV rips.  It will probably not be of any use with other video files.  It only accepts NTSC or PAL SD video and that video ideally should not have been edited or reencoded since being ripped from DVD.  It is possible that it will work with other SD sources like digitized VHS or Laserdisc video, but I don't have any to try.
 
 Before you read further, this is a hobby project that I made for my own needs.  I am not a video professional and this is as much a learning project for me as anything.  I don't really know what I am doing.  The script is just built around ffmpeg and I am probably not even making full use of its capabilities.  So, keep your expectations minimal and perhaps you will be pleasantly surprised.
 
@@ -102,7 +102,7 @@ I plan to improve PAL conversion in the future so that all audio and subtitles a
 
 ## Installation
 
-The script requires a system that runs a bash shell (Linux/Unix/Mac or Windows with the Linux subsystem) and ffmpeg, ffprobe, and mkvtoolnix must be installed.  I have only tested it on Ubuntu Linux, so there might well be minor compatibility problems with other distros or systems.  I will do my best to fix problems that crop up on other platforms, but my experience with them is limited.
+The script requires a system that runs a bash shell (Linux/Unix/Mac or Windows with the Linux subsystem) and ffmpeg, ffprobe, and mkvtoolnix must be installed.  I have only tested it on Ubuntu Linux, so there might well be minor compatibility problems with other distros or systems.  I will do my best to fix problems that crop up on other platforms, but my experience with them is limited.  This could probably be ported to run natively on Windows without too much trouble, since the tools that it uses are all available in Windows native versions, but I haven't run Windows in 20 years, so I am probably not the one to do it.
 
 The two scripts, drp and smap, are just bash scripts and can be installed anywhere that is convenient.  You might just keep them in your home directory.  If you want them to be in path, then the /usr/local/bin directory wouldn't be a bad place to put them.
 
@@ -175,7 +175,7 @@ The settings are found at the top of each of the script files.
 
 #### ALLOWLOSS
 
-The more invasive the method used by the script, the more likely that the runtime of the video will change.  Usually, it ends up slightly shorter due to dropped frames, but occasionally it will also run slightly longer, so this setting really refers to runtime change, not just loss.  In most cases, the difference is small enough that it does not matter, but a big enough change will result in audio that is out of sync.  Videos that change by more than ALLOWLOSS will be renamed to indicate the time difference.  Also, segments that change by more than this amount may be retried with an alternate method to see if it produces a better result.
+The more invasive the method used by the script, the more likely that the runtime of the video will change.  Usually, it ends up slightly shorter due to dropped frames, but occasionally it will also run slightly longer, so this setting really refers to runtime change, not just loss.  In most cases, the difference is small enough that it does not matter, but a big enough change will result in audio that is out of sync.  Videos that change by more than ALLOWLOSS will be renamed to indicate the time difference.  Also, segments that change by more than this amount may be retried with an alternate method to see if it produces a better result.  This is a percentage, so the default value allows a change of 1.44 seconds per hour of video.
 
 Default is 0.04.
 
@@ -235,7 +235,7 @@ Set to 1 to enable logging or 0 to disable it.  Logs are written to 00DRP/LOGS. 
 
 #### MINSEG
 
-Segments shorter than MINSEG will be ignored.  Very short segments may be false positives or inconsequential parts like black screen transitions that will lose nothing as a result of dropped frames.  There is no right answer when it comes to this setting.  0.5 is the shortest practical setting and should catch just about everything, but I've found that 1 is a better default.
+Segments shorter than MINSEG will be ignored.  Very short segments may be false positives or inconsequential parts like black screen transitions that will lose nothing as a result of dropped frames.  There is no right answer when it comes to this setting.  0.5 is the shortest practical setting and should catch just about everything, but I've found that 3 is a better default.  You might think that the smallest possible value would give the best result, but the transitions between frame rates are not always clean, which means that very short segments are the most likely to be misdiagnosed.  It almost always does less harm for transitions to get processed with the leading or following segment.  I do occasionally run across content that needs a lower MINSEG though.  If you find that you just can't get a good audio sync, try adjusting this to 2 or 1.
 
 #### OUTDIR
 
@@ -253,7 +253,7 @@ Because this script writes out thousands of files per analysis, using a memory f
 
 If the script crashes or you break out of it, you will need to manually unmount the filesystem, which you can do with the following command:
 
-sudo umount ~/OODRP/segments
+sudo umount ~/00DRP/segments
 
 (This command assumes that you have not changed OUTDIR.)
 

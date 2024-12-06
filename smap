@@ -1,5 +1,5 @@
 #!/bin/bash
-# smap (Segment Mapper) bash script - Dec. 4 2024
+# smap (Segment Mapper) bash script - Dec. 5 2024
 #
 # This script attempts to analyze an MKV file produced by MakeMKV from a DVD 
 # source and find where the original frame rates change in the video.  It
@@ -7,38 +7,11 @@
 
 # Settings
 SEGSIZE="0.1"
-# How finely should the script slice the video for analysis?  A segment 
-# time of 0.1 effectively instructs ffmpeg to make the smallest possible 
-# segments.  Usually, the smallest that ffmpeg will produce is about 1/2 
-# second.  Small values will catch brief, but real, transitions at the 
-# cost of significantly increased processing time.  Whether those short 
-# segments exist in the content you are analyzing is uncertain and whether 
-# or not you care about potentially missing a few interlaced frames is a 
-# matter of preference.  If your video has no short segments, you can
-# increase the value for faster mapping.
+MINSEG="3"
+USERAMDISK=1
+OUTDIR="/home/bill/data/2process"
 
-MINSEG="1"
-# Segments shorter than MINSEG will be ignored.  Very short segments may 
-# be false positives or inconsequential parts like black screen transitions 
-# that will lose nothing as a result of dropped frames.  There is no right 
-# answer when it comes to this setting.  0.5 is the shortest practical 
-# setting and should catch just about everything, but I've found that 1 is 
-# a better default.
-
-USERAMDISK=0
-# If enabled, the script will create an 8GB tmpfs memory filesystem.  This will 
-# consume 8GB of RAM for the duration that the script runs, so you probably 
-# wouldn't want to do this on a system that has less than 16GB of RAM.  
-#
-# Because this script writes out thousands of files per analysis, using a
-# memory filesystem seems like a good idea.  Writing lots of small files over
-# and over might accelerate disk wear.  This is disabled by default, but if you
-# have the RAM, I recommend enabling it.
-#
-# If the script crashes or you break out of it, you will need to manually
-# unmount the filesystem.
-
-OUTDIR="~" # Set to your output directory (default is home dir)
+# Best not to change the following settings unless you know what you're doing
 TEMPDIR="$OUTDIR/00DRP"
 LOGDIR="$TEMPDIR/LOGS"
 SEGDIR="$TEMPDIR/segments"

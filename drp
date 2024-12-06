@@ -21,7 +21,7 @@ MERGEMKV=1
 FIXRATE=1
 AUTOMAP=1
 MAPPER="$(dirname "$0")/smap"
-OUTDIR="~"
+OUTDIR="/home/bill/data/2process"
 
 # Best not to change the following settings unless you know what you're doing
 TEMPDIR="$OUTDIR/00DRP"
@@ -322,7 +322,7 @@ function hardtelecine {
 		harddi
 		pctdiffb="$pctdiff"
 		outnameb="$outname"
-		if [ "$(echo "$pctdiffb <= $ALLOWLOSS" |bc -l)" -eq 1 ] && [ "$(echo "$pctdiffb < $pctdiffa" |bc -l)" -eq 1 ]; then
+		if [ "$(echo "$pctdiffb < $pctdiffa" |bc -l)" -eq 1 ]; then
 			echo "HardDI method produced a better runtime change.  Using it instead."
 			outname="$outnameb"
 			
