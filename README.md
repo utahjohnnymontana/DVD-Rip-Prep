@@ -69,7 +69,7 @@ I'm sure that you are wondering why you would do manual mapping when the script 
 
 It is also possible for the script to automatically generate segment maps.  This now works pretty reliably on most of the rips that I have tested, but I don't expect that it will work for everything.  If you have videos with relatively simple structures, like the example above in the Manual Mapping section, then it will probably be faster to make manual maps than to do it automatically.  However, if your video has many small segments, the automatic mapper is likely to do the job faster.
 
-Drp uses an accessory script, smap, to do the mapping.  If you have AUTOMAP enabled, then the whole process takes place automatically.  If AUTOMAP is disabled, which is the default setting, then you need to run the smap script on each file yourself (smap file).
+Drp uses an accessory script, smap, to do the mapping.  If you have AUTOMAP enabled, which is now the default, then the whole process takes place automatically.  If AUTOMAP is disabled, then you need to run the smap script on each file yourself (smap file).
 
 Smap divides the file into hundreds or thousands of short segments and analyzes each of those to determine where frame rate changes occur in the file.  It then outputs this data as a segment map file.  Once the segment map file has been created, you can run drp normally and it will use the map file.
 
@@ -168,6 +168,8 @@ Run drp in conversion mode.
 > drp episodeSxxExx.mkv  
 
 ## Settings
+
+The settings are found at the top of each of the script files.
 
 ### drp Settings
 
