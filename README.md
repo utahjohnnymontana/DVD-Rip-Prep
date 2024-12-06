@@ -100,7 +100,7 @@ As far as I can tell, any content that you find on a PAL format DVD that was ori
 
 I plan to improve PAL conversion in the future so that all audio and subtitles are converted automatically.  I just don't have a lot of PAL DVDs, so it hasn't been a high priority.
 
-### Installation
+## Installation
 
 The script requires a system that runs a bash shell (Linux/Unix/Mac or Windows with the Linux subsystem) and ffmpeg, ffprobe, and mkvtoolnix must be installed.  I have only tested it on Ubuntu Linux, so there might well be minor compatibility problems with other distros or systems.  I will do my best to fix problems that crop up on other platforms, but my experience with them is limited.
 
@@ -111,7 +111,7 @@ You can run them through bash, like 'bash drp' or 'bash smap', but if you want t
 > chmod +x drp  
 > chmod +x smap  
 
-### Usage
+## Usage
 
 | Command | Description |
 | --- | --- |
@@ -167,4 +167,91 @@ Run drp in conversion mode.
 
 > drp episodeSxxExx.mkv  
 
+## Settings
+
+### drp Settings
+
+#### ALLOWLOSS
+
+The more invasive the method used by the script, the more likely that the runtime of the video will change.  Usually, it ends up slightly shorter due to dropped frames, but occasionally it will also run slightly longer, so this setting really refers to runtime change, not just loss.  In most cases, the difference is small enough that it does not matter, but a big enough change will result in audio that is out of sync.  Videos that change by more than ALLOWLOSS will be renamed to indicate the time difference.  Also, segments that change by more than this amount may be retried with an alternate method to see if it produces a better result.
+
+Default is 0.04.
+
+#### AUTOMAP
+
+If enabled (1), runs the segment mapper in batch mode.  If disabled (0), you will need to run smap on mixed files manually.  Default is enabled.  Disable if you prefer to run smap and drp separately.
+
+#### CONVPAL
+
+If you feed the script PAL video, it will slow it from 25 to 24 FPS, hopefully restoring the original runtime and audio pitch.  The script will output an audio MKV with the default track stretched 4% to match up with the slower frame rate.  You will need to add this track to the final MKV after you upscale.  If you have alternate audio or sub tracks that need to be matched to the slower frame rate, you can use the strech function in MKVToolnix with a value of 1.042708289.
+
+Set to 1 to enable PAL conversion or 0 to disable it.  Default is enabled (1).
+
+#### FIXRATE
+
+What to do when a file contains more than one true frame rate.  That is, after applying detelecine, do we now have a mix of 24FPS video and deinterlaced 30 FPS video?  If so, the script can:
+
+0 - Do nothing.  If you set this to zero, then OUTPUTSEGS should be 1.
+1 - Reduce the frame rate to 24 FPS by dropping frames from 30FPS segments.
+2 - Increase all segments to 120 FPS by quintupling 24 and quadrupling 30.
+
+The default of 1 works well for most of my library, in which 30FPS sections tend to be short, but it does drop frames to get the lower frame rate, so it is destructive.  In videos that have substantial 30 FPS segments, 2 would be  a better approach.  2 is always the lossless approach, but 120 FPS videos might not play on everything.  FIXRATE 2 is also still new/experimental and does not always work well for reasons that I don't understand.  FIXRATE 0 will just output the segment files at their native frame rates and you can decide what to do with them.
+
+#### HTCTHRESH
+
+Sets the percentage threshhold above which a video is considered to be hard telecined.  The default setting is 2.5.  Settings between 1 and 25 are probably reasonable and might give good results with some sources.
+
+#### INTLTHRESH
+
+Sets the percentage threshhold above which a video is condidered to be fully interlaced.  The default setting is 50.  Settings between 40 and 80 are probably reasonable and might give good results with some sources.
+
+#### MAPPER
+
+Specify the location of the segment mapper script.  The default is the smap script that comes with drp, but you could potentially modify your own mapper to meet different requirements.  All that it needs to do is accept a file name as input and output a segment map file.  Default is "$(dirname "$0")/smap", which is a file named smap in the same directory as drp.
+
+#### MERGEMKV
+
+By default, the script outputs a file containing only the video track, as this seems to work better with TVAI sometimes.  If you enable merging, then drp will also output a copy that is merged with the original MKV, which allows you to compare the two video tracks and make sure that the audio syncs up.  OUTPUTJOIN must be enabled (1) for this to work.  Default is enabled (1).
+
+#### OUTDIR
+
+This is the directory that you want the script to use for its output and working directories.  Default is your home directory (~).
+
+#### OUTPUTJOIN
+
+If enabled, the script will output a rejoined output file when the mixed process was used (the input file is divided into segments for processing and then those segments are rejoined into a single MKV file for output).  This can be used in combination with OUTPUTSEGS.  Default is enabled (1)
+
+#### OUTPUTSEGS
+
+If enabled, the script will output the processed segments when the mixed process was used.  You might want to output the segments if you would like to upscale them separately.  This can be used in combination with OUTPUTJOIN.  Default is disabled (0).
+
+#### WRITELOGS
+
+Set to 1 to enable logging or 0 to disable it.  Logs are written to 00DRP/LOGS.  Default is enabled (1).
+
+### smap Settings
+
+#### MINSEG
+
+Segments shorter than MINSEG will be ignored.  Very short segments may be false positives or inconsequential parts like black screen transitions that will lose nothing as a result of dropped frames.  There is no right answer when it comes to this setting.  0.5 is the shortest practical setting and should catch just about everything, but I've found that 1 is a better default.
+
+#### OUTDIR
+
+This is the directory that you want the script to use for its output and working directories.  Default is your home directory (~).
+
+#### SEGSIZE
+
+How finely should the script slice the video for analysis?  The default time of 0.1 effectively instructs ffmpeg to make the smallest possible segments.  Usually, the smallest that ffmpeg will actually produce is about 1/3 second.  Small values will catch brief, but real, transitions at the cost of significantly increased processing time.  Whether those short segments exist in the content you are analyzing is uncertain and whether or not you care about potentially missing a few interlaced frames is a matter of preference.  If your video has no short segments, you can increase the value for faster mapping.
+
+#### USERAMDISK
+
+If enabled (1), the script will create an 8GB tmpfs memory filesystem for the mapper to use.  This will consume 8GB of RAM for the duration that the script runs, so you probably wouldn't want to do this on a system that has less than 16GB of RAM.
+
+Because this script writes out thousands of files per analysis, using a memory filesystem seems like a good idea.  Writing lots of small files over and over might accelerate disk wear.  This is disabled (0) by default, but if you have the RAM, I recommend enabling it.
+
+If the script crashes or you break out of it, you will need to manually unmount the filesystem, which you can do with the following command:
+
+sudo umount ~/OODRP/segments
+
+(This command assumes that you have not changed OUTDIR.)
 
