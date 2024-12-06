@@ -10,69 +10,20 @@
 # motion irregularities resulting from dropped or duplicated frames.
 
 # Settings
-WRITELOGS=1 # Set to 0 to disable logging
-
-CONVPAL=1 # Set to 0 to disable PAL conversions
-# If you feed the script PAL video, it will slow it from 25 to 24 FPS, hopefully
-# restoring the original runtime and audio pitch.  The script will output an audio
-# MKV with the default track stretched 4% to match up with the slower frame rate.
-# You will need to add this track to the final MKV after you upscale.  If you have
-# alternate audio or sub tracks that need to be matched to the slower frame rate,
-# you can use the strech function in MKVToolnix with a value of 1.042708289.
-
-ALLOWLOSS="0.03" # Percent of runtime loss that is allowed (about 1s per hour)
-# The more invasive the method used by the script, the more likely that the runtime
-# of the video will change.  Usually, it ends up slightly shorter due to dropped
-# frames, but occasionally it will also run slightly longer.  In most cases, the
-# difference is small enough that it does not matter, but a big enough change will
-# result in audio that is out of sync.  Videos that lose more than ALLOWLOSS will
-# be renamed to indicate the time loss.  Also, segments that lose more than this
-# amount may be retried with an alternate method to see if it produces a better
-# result.
-
+WRITELOGS=1
+CONVPAL=1
+ALLOWLOSS="0.04"
 HTCTHRESH="2.5"
 INTLTHRESH="50"
-# HTCTHRESH and INTLTHRESH define the percentage of frames that mark hard telecine
-# and true interlacing, respectively.
-
 OUTPUTJOIN=1
 OUTPUTSEGS=0
-# The script can output either or both of the processed segments or the segments
-# rejoined into a single file.  You might want the segments if you plan to upscale
-# them individually.  Default is to output only the rejoined file.
-
-MERGEMKV=1 # Set to 0 to disable merging
-# By default, the script outputs a file containing only the video track, as this
-# seems to work better with TVAI sometimes.  If you enable merging, then it will
-# also output a copy that is merged with the original MKV, which allows you to
-# compare the two video tracks and make sure that the audio syncs up.  OUTPUTJOIN
-# must be 1 for this to work.
-
+MERGEMKV=1
 FIXRATE=1
-# What to do when a file contains more than one true frame rate.  That is, after
-# applying detelecine, do we now have a mix of 24FPS video and deinterlaced 30
-# FPS video?  If so, the script can:
-# 0 - Do nothing.  If you set this to zero, then OUTPUTSEGS should be 1.
-# 1 - Reduce the frame rate to 24 FPS by dropping frames from 30FPS segments.
-# 2 - Increase all segments to 120 FPS by quintupling 24 and quadrupling 30.
-# The default of 1 works well for most of my library, in which 30FPS sections
-# tend to be short, but it does drop frames to get the lower frame rate, so it
-# is destructive.  In videos that have substantial 30 FPS segments, 2 would be 
-# a better approach.  2 is always the lossless approach, but 120 FPS videos
-# might not play on everything.
-
-AUTOMAP=0
-# If enabled, run the segment mapper in batch mode.  If disabled, you will need
-# to run smap on mixed files manually.  Default is disabled because mapping is
-# a slow and resource intensive process.
-
+AUTOMAP=1
 MAPPER="$(dirname "$0")/smap"
-# Specify the location of the segment mapper script.  The default is the smap
-# script that comes with drp, but you could potentially modify your own mapper 
-# to meet different requirements.  All that it needs to do is accept a file 
-# name as input and output a segment map file.
+OUTDIR="~"
 
-OUTDIR="~" # Set to your output directory (default is home dir)
+# Best not to change the following settings unless you know what you're doing
 TEMPDIR="$OUTDIR/00DRP"
 LOGDIR="$TEMPDIR/LOGS"
 STEP1DIR="$TEMPDIR/STEP1"
@@ -371,7 +322,7 @@ function hardtelecine {
 		harddi
 		pctdiffb="$pctdiff"
 		outnameb="$outname"
-		if [ "$(echo "$pctdiffb < $pctdiffa" |bc -l)" -eq 1 ]; then
+		if [ "$(echo "$pctdiffb <= $ALLOWLOSS" |bc -l)" -eq 1 ] && [ "$(echo "$pctdiffb < $pctdiffa" |bc -l)" -eq 1 ]; then
 			echo "HardDI method produced a better runtime change.  Using it instead."
 			outname="$outnameb"
 			
@@ -498,6 +449,20 @@ function softtelecine {
 		-c:v ffv1 "$outfile"
 	fi
 	checkduration "$file" "$outfile"
+	if [ "$tryalt" -eq "1" ]; then
+		outnamea="$outname"
+		pctdiffa="$pctdiff"
+		harddi
+		pctdiffb="$pctdiff"
+		outnameb="$outname"
+		if [ "$(echo "$pctdiffb <= $ALLOWLOSS" |bc -l)" -eq 1 ] && [ "$(echo "$pctdiffb < $pctdiffa" |bc -l)" -eq 1 ]; then
+			echo "HardDI method produced a better runtime change.  Using it instead."
+			outname="$outnameb"
+		else
+			echo "HardDI method was not better than SDTC.  Keeping SDTC result." 
+			outname="$outnamea"
+		fi
+	fi
 }
 
 function runsegments {
@@ -707,7 +672,7 @@ function ntscinterlaced {
 		harddi
 		pctdiffb="$pctdiff"
 		outnameb="$outname"
-		if [ "$(echo "$pctdiffb < $pctdiffa" |bc -l)" -eq 1 ]; then
+		if [ "$(echo "$pctdiffb <= $ALLOWLOSS" |bc -l)" -eq 1 ] && [ "$(echo "$pctdiffb < $pctdiffa" |bc -l)" -eq 1 ]; then
 			echo "HardDI method produced a better runtime change.  Using it instead."
 			outname="$outnameb"
 		else
