@@ -1,5 +1,5 @@
 #!/bin/bash
-# drp (DVD Rip Prep) bash script - Dec. 6 2024
+# drp (DVD Rip Prep) bash script - Dec. 7 2024
 #
 # This script attempts to take an MKV file produced by MakeMKV from a DVD source
 # and output a new file without telecine or interlacing and at the correct frame

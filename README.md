@@ -4,6 +4,8 @@ DVD Rip Prep (drp) is a bash script that attempts to prepare an MKV file produce
 
 Before you read further, this is a hobby project that I made for my own needs.  I am not a video professional and this is as much a learning project for me as anything.  I don't really know what I am doing.  The script is just built around ffmpeg and I am probably not even making full use of its capabilities.  So, keep your expectations minimal and perhaps you will be pleasantly surprised.
 
+There are other well established tools for doing this kind of work, but they weren't a good solution for me because they run on Windows and generally work best with rips that were not made by MakeMKV.  I run Linux and I have thousands of MakeMKV rips and I really didn't want to start over.  I also wanted a tool that was automatic as much as possible.  There is no question that I could get better results doing everything manually, but I only have so much time to spend.  My goal was to get a good result, not necessarily the best possible result, with the lowest possible amount of effort per video.
+
 ## Background
 
 To understand why this exists, you need to know a few things about video, DVDs, and upscaling.  Until recently, most movies and TV shows were shot on film, at a frame rate of 24 FPS (actually 23.976025 or 24000/1001).  The rate at which TV screens refresh is tied to the cycle rate of the power that they use.  In North America, this was 30 FPS (29.97003 or 30000/1001) and, in Europe, it was 25 FPS.  The North American standard is known as NTSC and the European standard is PAL.  There are other standards as well.  Screens are now somewhat more flexible than in the days of tube TVs, but we still live in a world where the standards were set in the past.  The problem here is that the rate at which the video was recorded and the rate at which is is displayed are different.  Several methods are used to make 24 FPS video play at 30 FPS or 25 FPS.  In North America, we used telecine to make 24 FPS content play like 30 FPS.  In Europe, since 24 and 25 FPS are so close, they usually just played 24 FPS content at 25 FPS. The video and audio play about 4% faster, but the difference isn't very noticeable.
@@ -233,6 +235,10 @@ Set to 1 to enable logging or 0 to disable it.  Logs are written to 00DRP/LOGS. 
 
 ### smap Settings
 
+#### KEEPRAMDISK
+
+If enabled (1), then the memory filesystem will not be unmounted at the end of the run.  This is helpful if you are troubleshooting and want to look at the working files.  Default is disabled (0).
+
 #### MINSEG
 
 Segments shorter than MINSEG will be ignored.  Very short segments may be false positives or inconsequential parts like black screen transitions that will lose nothing as a result of dropped frames.  There is no right answer when it comes to this setting.  0.5 is the shortest practical setting and should catch just about everything, but I've found that 3 is a better default.  You might think that the smallest possible value would give the best result, but the transitions between frame rates are not always clean, which means that very short segments are the most likely to be misdiagnosed.  It almost always does less harm for transitions to get processed with the leading or following segment.  I do occasionally run across content that needs a lower MINSEG though.  If you find that you just can't get a good audio sync, try adjusting this to 2 or 1.
@@ -247,9 +253,7 @@ How finely should the script slice the video for analysis?  The default time of 
 
 #### USERAMDISK
 
-If enabled (1), the script will create an 8GB tmpfs memory filesystem for the mapper to use.  This will consume 8GB of RAM for the duration that the script runs, so you probably wouldn't want to do this on a system that has less than 16GB of RAM.
-
-Because this script writes out thousands of files per analysis, using a memory filesystem seems like a good idea.  Writing lots of small files over and over might accelerate disk wear.  This is disabled (0) by default, but if you have the RAM, I recommend enabling it.
+If enabled (1), which is now the default, the script will create an 8GB tmpfs memory filesystem for the mapper to use.  This will consume 8GB of RAM for the duration that the script runs.  Because this script writes out thousands of files per analysis, using a memory filesystem seems like a good idea.  Writing lots of small files over and over might accelerate disk wear.  If you have less than 16GB of RAM, the RAMDISK will be automatically disabled, regardless of the setting.
 
 If the script crashes or you break out of it, you will need to manually unmount the filesystem, which you can do with the following command:
 

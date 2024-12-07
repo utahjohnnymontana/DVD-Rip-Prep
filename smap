@@ -1,5 +1,5 @@
 #!/bin/bash
-# smap (Segment Mapper) bash script - Dec. 6 2024
+# smap (Segment Mapper) bash script - Dec. 7 2024
 #
 # This script attempts to analyze an MKV file produced by MakeMKV from a DVD 
 # source and find where the original frame rates change in the video.  It
@@ -9,6 +9,7 @@
 SEGSIZE="0.1"
 MINSEG="3"
 USERAMDISK=1
+KEEPRAMDISK=0
 OUTDIR="~"
 
 # Best not to change the following settings unless you know what you're doing
@@ -34,11 +35,6 @@ function setup {
 		fi
 	fi
 	cd "$rundir" || exit 1
-if [ "$USERAMDISK" == 1 ]; then
-	cd "$rundir"
-	echo "Unmounting memory filesystem.  You may be prompted to authenticate if not root."
-	sudo umount "$SEGDIR"
-fi
 	if [ "$USERAMDISK" == 1 ]; then
 		mntstatus=$(grep "SEGDIR" /proc/mounts |cut -d' ' -f 3)
 		if [ "$mntstatus" == "tmpfs" ]; then
@@ -326,6 +322,15 @@ if [ ! -f "$infile" ]; then
 	exit 1
 fi
 
+# Make sure the system has at least 16GB or disable the ramdisk
+if [ "$USERAMDISK" == 1 ]; then
+	sysmem=$(free --giga |grep Mem |awk '/^Mem:/{print $2}')
+	if [ "$sysmem" -lt "16" ]; then
+		echo "The USERAMDISK option has been disabled due to insufficient memory."
+		USERAMDISK=0
+	fi
+fi
+
 timein="$(date +%s)"
 setup
 makesegs
@@ -351,4 +356,8 @@ timeout="$(date +%s)"
 runtime=$((timeout - timein))
 echo "Segment mapper completed analysis in $runtime seconds."
 
-
+if [ "$USERAMDISK" == 1 ] && [ "$KEEPRAMDISK" == 0 ]; then
+	cd "$rundir"
+	echo "Unmounting memory filesystem.  You may be prompted to authenticate if not root."
+	sudo umount "$SEGDIR"
+fi
