@@ -21,7 +21,7 @@ MERGEMKV=1
 FIXRATE=1
 AUTOMAP=1
 MAPPER="$(dirname "$0")/smap"
-OUTDIR="~"
+OUTDIR="/home/bill/data/2process"
 
 # Best not to change the following settings unless you know what you're doing
 TEMPROOT="$OUTDIR/00DRP"
@@ -600,6 +600,8 @@ function prepsegments {
 					startframe=$((startframe + 1))
 				fi
 				if [ "$segindex" -lt 10 ]; then
+					segname="$inname-segment-00$segindex-ffv1.mkv"
+				elif [ "$segindex" -lt 100 ]; then
 					segname="$inname-segment-0$segindex-ffv1.mkv"
 				else
 					segname="$inname-segment-$segindex-ffv1.mkv"
@@ -956,7 +958,6 @@ while getopts ":i:o:s:m:d" flag; do
 done
 shift $((OPTIND-1))
 
-clifile="$file"
 if [ "$dryrun" = 1 ]; then
 	LOGDIR="/dev/null"
 	STEP1DIR="/dev/null"
@@ -977,6 +978,7 @@ if [ "$file" != "" ]; then
 	if [ -f "$file" ]; then
 		echo "--------------------------------------------------"
 		echo "Starting drp run."
+		clifile="$file"
 		infile="$file"
 		step=1
 		process
@@ -993,6 +995,7 @@ else
 		for file in $(ls -1 *.mkv); do
 			echo "--------------------------------------------------"
 			echo "Starting drp run."
+			clifile="$file"
 			infile="$file"
 			step=1
 			process
