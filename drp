@@ -21,7 +21,7 @@ MERGEMKV=1
 FIXRATE=1
 AUTOMAP=1
 MAPPER="$(dirname "$0")/smap"
-OUTDIR="/home/bill/data/2process"
+OUTDIR="~"
 
 # Best not to change the following settings unless you know what you're doing
 TEMPROOT="$OUTDIR/00DRP"
