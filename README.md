@@ -279,11 +279,15 @@ This is a pretty easy one.  Most episodes are mixed, but it is mostly just that 
 
 The first episode is hard telecined, but the rest are all mixed.  This was one of my main testing shows.  Episodes vary in complexity, with some of the more special effects heavy episodes having more than thirty segments.  It ran successfully with default settings: SEGSIZE 0.1, MINSEG 3.
 
-### Alien Nation
+### Alien Nation (1989)
 
 This one is mostly mixed episodes, with a few hard telecined.  Everything but episode 1 ran just fine with default settings of SEGSIZE 0.1, MINSEG 3.  Episode 1 has an inseparable mix of hard telecine and interlaced material and needed to be processed at FIXRATE 2 (120FPS) to preserve motion.
 
-### Bonanza
+### Beasts (1976)
+
+PAL format, non-interlaced.  These ran just fine with the default settings.
+
+### Bonanza (1959)
 
 Season 1 is mostly hard telecined with a few mixed episodes.  All ran successfully with default settings: SEGSIZE 0.1, MINSEG 3.
 
@@ -293,4 +297,8 @@ Hard telecined all the way through.  Ran successfully with default settings: SEG
 
 ### The Twilight Zone (1985)
 
-These episodes are mostly hard telecined, but a few are mixed to a crazy degree, with hundreds of frame rate transitions.  I can't imagine what the editing process was like.  The mixed episodes need a MINSEG of 1.5.
+These episodes are mostly hard telecined, but a few are mixed to a crazy degree, with hundreds of frame rate transitions.  I can't imagine what the editing process was like.  The mixed episodes need a MINSEG of 1.
+
+### Wagon Train (1957)
+
+Mostly hard telecined, with a few mixed.  Ran successfully with default settings: SEGSIZE 0.1, MINSEG 3.
