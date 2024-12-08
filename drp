@@ -18,7 +18,7 @@ INTLTHRESH="50"
 OUTPUTJOIN=1
 OUTPUTSEGS=0
 MERGEMKV=1
-FIXRATE=1
+FIXRATE=2
 AUTOMAP=1
 MAPPER="$(dirname "$0")/smap"
 OUTDIR="~"
@@ -111,6 +111,7 @@ function reportsettings {
 	if [ "$dryrun" = 1 ]; then
 		echo "Doing a dry run..." |tee -a "$PRELOG"
 	fi
+	echo "FIXRATE mode is $FIXRATE"
 	echo "OUTDIR is $OUTDIR" |tee -a "$PRELOG"
 	echo "TEMPDIR is $TEMPDIR" |tee -a "$PRELOG"
 	echo "LOGDIR is $LOGDIR" |tee -a "$PRELOG"
@@ -300,16 +301,8 @@ function hardtelecine {
 			-i "$file" \
 			-an -sn \
 			-vf "fieldmatch,decimate,bwdif=mode=send_field:deint=interlaced" \
-			-r 24000/1001 \
-			-c:v ffv1 "$intfile"
-		ffmpeg -n \
-			-hide_banner \
-			-v warning \
-			-stats \
-			-i "$intfile" \
-			-an -sn \
 			-r 120000/1001 \
-			-c:v ffv1 "$outfile"
+			-c:v ffv1 "$intfile"
 	else
 		ffmpeg -n \
 			-hide_banner \
@@ -690,11 +683,11 @@ function ntscinterlaced {
 
 function checkinterlace {
 	echo "Counting interlaced frames..."  |tee -a "$logfile"
-	if [ -f $TEMPDIR/idet.out ]; then
-		rm -f $TEMPDIR/idet.out
+	if [ -f "$TEMPDIR/idet.out" ]; then
+		rm -f "$TEMPDIR/idet.out"
 	fi
-	if [ -f $TEMPDIR/idet.grep ]; then
-		rm -f $TEMPDIR/idet.grep
+	if [ -f "$TEMPDIR/idet.grep" ]; then
+		rm -f "$TEMPDIR/idet.grep"
 	fi
 	ffmpeg -an -sn \
 		-hide_banner \
@@ -702,18 +695,18 @@ function checkinterlace {
 		-filter:v idet \
 		-f null - \
 		-i "$file" 2>"$TEMPDIR/idet.out"
-	grep -m3 "Parsed_idet" $TEMPDIR/idet.out >$TEMPDIR/idet.grep
-	idetneither=$(sed -n 1,1p $TEMPDIR/idet.grep |tr -s ' ' |cut -d' ' -f7)
-	idettop=$(sed -n 1,1p $TEMPDIR/idet.grep |tr -s ' ' |cut -d' ' -f9)
-	idetbottom=$(sed -n 1,1p $TEMPDIR/idet.grep |tr -s ' ' |cut -d' ' -f11)
-	idetsftff=$(sed -n 2,2p $TEMPDIR/idet.grep |tr -s ' ' |cut -d' ' -f8)
-	idetsfbff=$(sed -n 2,2p $TEMPDIR/idet.grep |tr -s ' ' |cut -d' ' -f10)
-	idetsfprog=$(sed -n 2,2p $TEMPDIR/idet.grep |tr -s ' ' |cut -d' ' -f12)
-	idetsfundet=$(sed -n 2,2p $TEMPDIR/idet.grep |tr -s ' ' |cut -d' ' -f14)
-	idetmftff=$(sed -n 3,3p $TEMPDIR/idet.grep |tr -s ' ' |cut -d' ' -f8)
-	idetmfbff=$(sed -n 3,3p $TEMPDIR/idet.grep |tr -s ' ' |cut -d' ' -f10)
-	idetmfprog=$(sed -n 3,3p $TEMPDIR/idet.grep |tr -s ' ' |cut -d' ' -f12)
-	idetmfundet=$(sed -n 3,3p $TEMPDIR/idet.grep |tr -s ' ' |cut -d' ' -f14)
+	grep -m3 "Parsed_idet" "$TEMPDIR/idet.out" >"$TEMPDIR/idet.grep"
+	idetneither=$(sed -n 1,1p "$TEMPDIR/idet.grep" |tr -d ' ' |cut -d: -f3 |cut -dT -f1)
+	idettop=$(sed -n 1,1p "$TEMPDIR/idet.grep" |tr -d ' ' |cut -d: -f4 |cut -dB -f1)
+	idetbottom=$(sed -n 1,1p "$TEMPDIR/idet.grep" |tr -d ' ' |cut -d: -f5)
+	idetsftff=$(sed -n 2,2p "$TEMPDIR/idet.grep" |tr -d ' ' |cut -d: -f3 |cut -dB -f1)
+	idetsfbff=$(sed -n 2,2p "$TEMPDIR/idet.grep" |tr -d ' ' |cut -d: -f4 |cut -dP -f1)
+	idetsfprog=$(sed -n 2,2p "$TEMPDIR/idet.grep" |tr -d ' ' |cut -d: -f5 |cut -dU -f1)
+	idetsfundet=$(sed -n 2,2p "$TEMPDIR/idet.grep" |tr -d ' ' |cut -d: -f6)
+	idetmftff=$(sed -n 3,3p "$TEMPDIR/idet.grep" |tr -d ' ' |cut -d: -f3 |cut -dB -f1)
+	idetmfbff=$(sed -n 3,3p "$TEMPDIR/idet.grep" |tr -d ' ' |cut -d: -f4 |cut -dP -f1)
+	idetmfprog=$(sed -n 3,3p "$TEMPDIR/idet.grep" |tr -d ' ' |cut -d: -f5 |cut -dU -f1)
+	idetmfundet=$(sed -n 3,3p "$TEMPDIR/idet.grep" |tr -d ' ' |cut -d: -f6)
 
 	echo "Non-repeating Frames: $idetneither" |tee -a "$logfile"
 	echo "Top Fields: $idettop" |tee -a "$logfile"
