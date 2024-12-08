@@ -26,14 +26,15 @@ When telecine is removed from filmed content, the frame rate is restored to 24 F
 
 In other cases, the 30 FPS sections might be special effects and dropping frames would be really noticeable.  In that case, the only solution is to increase the overall frame rate of the video to something that can accommodate both rates.  The closest frame rate that is wholly divisible by 24, 30, and 60 is 120.  So, a video that mixes 24 FPS filmed content and 30 FPS video content can be increased to 120 FPS by quintupling the 24 FPS frames and quadrupling the 30 FPS frames.  This maintains the original cadence of all content.  The script can now perform this 120FPS conversion (set FIXRATE to 2) but, for reasons that I don't yet understand, it does not always produce a result with the same audio sync as the lower frame rate version, so this is an experimental feature.
 
+Writing this script has been quite an education and, if I had known what I know now in the beginning, I might have dropped the idea.  The ways that these techniques are used on TV shows, even within a given season of a given show, is surprisingly inconsistent and, in some cases, looks outright crazy.  There are, of course, a lot of shows that use just one technique or use a mix but at least in a predictable pattern.  But there are also a surprisingly large number of shows that go from one technique to another from episode to episode and that mix them in ways that seem quite strange.  Some use mixes in a way that almost seems intentionally designed to defeat any future efforts to disentagle them.  I have been able to figure out solutions for a lot of shows, but there are some that I will probably never crack and can only approach with a "least bad" method.
+
 ### Upscaling
 
 Most people who are interested in this script are probably intending to upscale video with Topaz Video AI or other software, which is the reason why I wrote it. TVAI can deal with the easy cases itself, as long as you know how to tell it what to do.  The hard part is knowing what to tell it to do.  TVAI does not recognize soft telecined content, which you can see when you load the video.  It will see the original frame rate as 29.97 and will output the same.  So, you are better off re-encoding soft telecined videos before importing to TVAI.  TVAI can perform inverse telecine for hard telecined video using the setting found under Input/Edit, but this will wreck anything that isn't actually hard telecined.  And TVAI can deinterlace using the very same function that I use in the script, but the problem is that there are very few instances of movies or TV on DVD that are actually interlaced all the way through.  And Topaz has nothing that will deal with the problem of mixed methods in the video.
 
 If you tell TVAI to do the wrong things, your results generally won't be as good as they could be.  You might not notice the problems introduced by misapplications of deinterlacing because TVAI output often looks so much better that it is easy to overlook the small problems that it can introduce.  I had upscaled a lot of videos, which took a lot of time, before I started to notice stutters and artifacts related to improper deinterlacing.  I then spent even more time fiddling around with TVAI settings to no great success because the real problem was that I was feeding it defective video.
 
-So, the first function of drp is to look at MKVs and decide if they are soft telecined, hard telecined, interlaced, or some horrifying combination of these techniques (which is, unfortunately, common).  Originally, this was my only goal for the script.  I wanted something that would analyze the videos and give me a report so that I could then apply the appropriate techniques to recover fully progressive video for upscaling.  As these things tend to go, I then wondered if I could make the script actually do all of the work and fix
-the video.  In a lot of cases, now it can.
+So, the first function of drp is to look at MKVs and decide if they are soft telecined, hard telecined, interlaced, or some horrifying combination of these techniques (which is, unfortunately, common).  Originally, this was my only goal for the script.  I wanted something that would analyze the videos and give me a report so that I could then apply the appropriate techniques to recover fully progressive video for upscaling.  As these things tend to go, I then wondered if I could make the script actually do all of the work and fix the video.  In a lot of cases, now it can.
 
 ## Features
 
@@ -123,6 +124,7 @@ You can run them through bash, like 'bash drp' or 'bash smap', but if you want t
 | **drp -o** directory | Override drp OUTDIR. |
 | **drp -s** value | Override smap SEGSIZE. |
 | **drp -m** value | Override smap MINSEG. |
+| **drp -f** value | Override drp FIXRATE. |
 | **smap** file | Single file mode - it will create a segment map for the named file. |
 
 There are settings at the top of each script file that you can change.  They are explained in the comments.
@@ -277,9 +279,17 @@ This is a pretty easy one.  Most episodes are mixed, but it is mostly just that 
 
 The first episode is hard telecined, but the rest are all mixed.  This was one of my main testing shows.  Episodes vary in complexity, with some of the more special effects heavy episodes having more than thirty segments.  It ran successfully with default settings: SEGSIZE 0.1, MINSEG 3.
 
+### Alien Nation
+
+This one is mostly mixed episodes, with a few hard telecined.  Everything but episode 1 ran just fine with default settings of SEGSIZE 0.1, MINSEG 3.  Episode 1 has an inseparable mix of hard telecine and interlaced material and needed to be processed at FIXRATE 2 (120FPS) to preserve motion.
+
+### Bonanza
+
+Season 1 is mostly hard telecined with a few mixed episodes.  All ran successfully with default settings: SEGSIZE 0.1, MINSEG 3.
+
 ### The Loner (1965)
 
-Hard telecined all the way through.  Ran successfully with default settings.
+Hard telecined all the way through.  Ran successfully with default settings: SEGSIZE 0.1, MINSEG 3.
 
 ### The Twilight Zone (1985)
 

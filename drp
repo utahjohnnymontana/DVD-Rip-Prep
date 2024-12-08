@@ -332,6 +332,38 @@ function hardtelecine {
 	fi
 }
 
+function hardmix {
+	# For videos that mix hard telecine and interlaced segments in a way that
+	# I don't know how to detect.  Use a frame level deinterlacer and up the
+	# frame rate to 120, so that we can hopefully get rid of both types of
+	# interlaced frames and preserve correct motion.
+	# This is a step 1 only method.  Segments will go to Hard DI instead.
+	outname="${inname}-120fps-hdtc-di-ffv1.mkv"
+	intname="${inname}-120fps-hdtc-di-ffv1-int.mkv"
+	if [ "$step" = 1 ]; then
+		outfile="$OUTDIR/$outname"
+		intfile="$OUTDIR/$intname"
+	elif [ "$step" = 3 ]; then
+		outfile="$STEP3DIR/$outname"
+		intfile="$STEP3DIR/$intname"
+	else
+		echo "ERROR: Input step does not make sense.  This is probably a bug."
+	fi
+	ffmpeg -n \
+		-hide_banner \
+		-v warning \
+		-stats \
+		-i "$file" \
+		-an -sn \
+		-vf "bwdif=mode=send_frame:deint=all" \
+		-r 120000/1001 \
+		-c:v ffv1 "$outfile"
+	checkduration "$file" "$outfile"
+	if [ "$tryalt" -eq "1" ]; then
+		echo "Already at last resort.  Nowhere to go from here."
+	fi
+}
+
 function harddi {
 	# HardDI is potentially destructive and only gets called as a last resort.
 	# Can't find the right pattern in this video, so just deinterlace it and 
@@ -824,7 +856,15 @@ function process {
 			echo "$file: Soft Telecine 24FPS" >>diagreport.txt
 		fi
 	elif [ "$nomfrate" == "30FPS" ]; then
-		if [ "$(echo "$pcthtc >= $HTCTHRESH" |bc -l)" -eq 1 ]; then
+		if [ "$(echo "$pcthtc >= $HTCTHRESH" |bc -l)" -eq 1 ] && [ "$(echo "$pctintl > 80" |bc -l)" -eq 1 ] && [ "$step" == "9" ]; then
+			echo "Diagnosis: Mixed hard telecine and interlacing." |tee -a "$logfile"
+			sleep 5; echo
+			if [ ! "$dryrun" = 1 ]; then
+				hardmix
+			else
+				echo "$file: Mixed HTC and Interlacing" >>diagreport.txt
+			fi
+		elif [ "$(echo "$pcthtc >= $HTCTHRESH" |bc -l)" -eq 1 ]; then
 			echo "Diagnosis: Hard telecined video at 24 FPS." |tee -a "$logfile"
 			sleep 5; echo
 			if [ ! "$dryrun" = 1 ]; then
@@ -910,6 +950,7 @@ while getopts ":i:o:s:m:d" flag; do
 		d) dryrun=1;;
 		s) dsegsize="${OPTARG}";;
 		m) dminseg="${OPTARG}";;
+		f) FIXRATE="${OPTARG}";;
 		*) exit 1;;
 	esac
 done
