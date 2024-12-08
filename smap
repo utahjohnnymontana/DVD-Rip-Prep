@@ -1,25 +1,35 @@
 #!/bin/bash
-# smap (Segment Mapper) bash script - Dec. 7 2024
+# smap (Segment Mapper) bash script - Dec. 8 2024
 #
 # This script attempts to analyze an MKV file produced by MakeMKV from a DVD 
 # source and find where the original frame rates change in the video.  It
 # then creates a segment map that drp can use to process the MKV.
 
 # Settings
-SEGSIZE="0.1"
-MINSEG="3"
 USERAMDISK=1
 KEEPRAMDISK=0
-OUTDIR="~"
+SEGSIZE="0.1"
+MINSEG="3"
 
-# Best not to change the following settings unless you know what you're doing
-TEMPDIR="$OUTDIR/00DRP"
+# Set directories if not exported from drp (i.e. if not running smap directly)
+if [ ! "$OUTDIR" ]; then
+	OUTDIR="~"
+fi
+if [ ! "$TEMPROOT" ]; then
+	TEMPROOT="$OUTDIR/00DRP"
+fi
+if [ ! "$TEMPDIR" ]; then
+	TEMPDIR="$OUTDIR/00DRP/$(date +%s)"
+fi
 LOGDIR="$TEMPDIR/LOGS"
 SEGDIR="$TEMPDIR/segments"
 # End of settings
 
 function setup {
 	echo "Setting up directories and cleaning up from previous run..."
+	if [ ! -d "$TEMPROOT" ]; then
+		mkdir "$TEMPROOT" || exit 1
+	fi
 	if [ ! -d "$TEMPDIR" ]; then
 		mkdir "$TEMPDIR" || exit 1
 	fi
@@ -45,6 +55,25 @@ function setup {
 		fi
 	fi
 	sleep 10
+}
+
+function reportsettings {
+	echo "Reporting settings..."
+	if [ "$USERAMDISK" = 1 ]; then
+		echo "Memory filesystem is enabled."
+	else
+		echo "Memory filesystem is disabled"
+	fi
+	if [ "$KEEPRAMDISK" = 1 ]; then
+		echo "Memory filesystem will be retained."
+	else
+		echo "Memory filesystem will be torn down."
+	fi
+	echo "Analysis segment size is $SEGSIZE."
+	echo "Retained segment size is $MINSEG." 
+	echo "OUTDIR is $OUTDIR"
+	echo "TEMPDIR is $TEMPDIR"
+	echo "LOGDIR is $LOGDIR"
 }
 
 function makesegs {
@@ -306,7 +335,7 @@ function makemap {
 		echo -n "$time," >>"$mapfile"
 	done
 	echo "end" >>"$mapfile"
-	if [ "$SUDO_USER" ]; then
+	if [ -f "$mapfile" ] && [ "$SUDO_USER" ]; then
 		chown "$SUDO_USER" "$mapfile"
 	fi
 }
@@ -331,8 +360,17 @@ if [ "$USERAMDISK" == 1 ]; then
 	fi
 fi
 
+if [[ ! -z $dsegsize ]]; then
+	SEGSIZE="$dsegsize"
+fi
+if [[ ! -z $dminseg ]]; then
+	MINSEG="$dminseg"
+fi
+
 timein="$(date +%s)"
 setup
+reportsettings
+sleep 3
 makesegs
 
 cd $SEGDIR || exit 1

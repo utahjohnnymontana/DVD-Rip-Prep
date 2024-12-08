@@ -1,5 +1,5 @@
 #!/bin/bash
-# drp (DVD Rip Prep) bash script - Dec. 7 2024
+# drp (DVD Rip Prep) bash script - Dec. 8 2024
 #
 # This script attempts to take an MKV file produced by MakeMKV from a DVD source
 # and output a new file without telecine or interlacing and at the correct frame
@@ -24,12 +24,13 @@ MAPPER="$(dirname "$0")/smap"
 OUTDIR="~"
 
 # Best not to change the following settings unless you know what you're doing
-TEMPDIR="$OUTDIR/00DRP"
+TEMPROOT="$OUTDIR/00DRP"
+TEMPDIR="$OUTDIR/00DRP/$(date +%s)"
 LOGDIR="$TEMPDIR/LOGS"
 STEP1DIR="$TEMPDIR/STEP1"
 STEP2DIR="$TEMPDIR/STEP2"
 STEP3DIR="$TEMPDIR/STEP3"
-PRELOG="$LOGDIR/prelog"
+PRELOG="/tmp/prelog.$(date +%s)"
 # End of settings
 
 function setup {
@@ -55,7 +56,10 @@ function setup {
 		echo "ERROR: OUTDIR ($OUTDIR) does not exist."
 		exit 1
 	fi
-	if [ ! -d "$TEMPDIR" ] && [ "$dryrun" != 1 ]; then
+	if [ ! -d "$TEMPROOT" ]; then
+		mkdir "$TEMPROOT" || exit 1
+	fi
+	if [ ! -d "$TEMPDIR" ]; then
 		mkdir "$TEMPDIR" || exit 1
 	fi
 	if [ ! -d "$LOGDIR" ] && [ "$dryrun" != 1 ]; then
@@ -116,8 +120,8 @@ function reportsettings {
 }
 
 function cleanup {
-	echo "Cleaning up from previous run..."
-	if [ -d "$TEMPDIR" ] && [ "$dryrun" != 1 ]; then
+	echo "Cleaning up temporary files and directories..."
+	if [ -d "$TEMPDIR" ]; then
 		cd $TEMPDIR || exit 1
 		if [ "$(pwd)" == "$TEMPDIR" ]; then
 			rm -f * >/dev/null 2>&1
@@ -188,6 +192,8 @@ function mergeinout {
 	if [ -f "$outfile" ] && [ -f "$rundir/$clifile" ] &&  [ "$segfail" != 1 ]  && [ "$dryrun" != 1 ]; then
 		echo "Merging with original file..." |tee -a "$logfile"
 		mkvmerge -o "$OUTDIR/$mergename" --track-name 0:"DRP Output" "$outfile" "$rundir/$clifile"
+	else
+		echo "DEBUG: $outfile,$rundir/$clifile,$segfail,$dryrun"
 	fi
 	if [ "$SUDO_USER" ]; then
 		chown "$SUDO_USER" "$OUTDIR/$mergename"
@@ -684,24 +690,30 @@ function ntscinterlaced {
 
 function checkinterlace {
 	echo "Counting interlaced frames..."  |tee -a "$logfile"
+	if [ -f $TEMPDIR/idet.out ]; then
+		rm -f $TEMPDIR/idet.out
+	fi
+	if [ -f $TEMPDIR/idet.grep ]; then
+		rm -f $TEMPDIR/idet.grep
+	fi
 	ffmpeg -an -sn \
 		-hide_banner \
 		-stats \
 		-filter:v idet \
 		-f null - \
-		-i "$file" 2>"/tmp/idet.out"
-	grep -m3 "Parsed_idet" /tmp/idet.out >/tmp/idet.grep
-	idetneither=$(sed -n 1,1p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f7)
-	idettop=$(sed -n 1,1p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f9)
-	idetbottom=$(sed -n 1,1p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f11)
-	idetsftff=$(sed -n 2,2p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f8)
-	idetsfbff=$(sed -n 2,2p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f10)
-	idetsfprog=$(sed -n 2,2p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f12)
-	idetsfundet=$(sed -n 2,2p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f14)
-	idetmftff=$(sed -n 3,3p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f8)
-	idetmfbff=$(sed -n 3,3p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f10)
-	idetmfprog=$(sed -n 3,3p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f12)
-	idetmfundet=$(sed -n 3,3p /tmp/idet.grep |tr -s ' ' |cut -d' ' -f14)
+		-i "$file" 2>"$TEMPDIR/idet.out"
+	grep -m3 "Parsed_idet" $TEMPDIR/idet.out >$TEMPDIR/idet.grep
+	idetneither=$(sed -n 1,1p $TEMPDIR/idet.grep |tr -s ' ' |cut -d' ' -f7)
+	idettop=$(sed -n 1,1p $TEMPDIR/idet.grep |tr -s ' ' |cut -d' ' -f9)
+	idetbottom=$(sed -n 1,1p $TEMPDIR/idet.grep |tr -s ' ' |cut -d' ' -f11)
+	idetsftff=$(sed -n 2,2p $TEMPDIR/idet.grep |tr -s ' ' |cut -d' ' -f8)
+	idetsfbff=$(sed -n 2,2p $TEMPDIR/idet.grep |tr -s ' ' |cut -d' ' -f10)
+	idetsfprog=$(sed -n 2,2p $TEMPDIR/idet.grep |tr -s ' ' |cut -d' ' -f12)
+	idetsfundet=$(sed -n 2,2p $TEMPDIR/idet.grep |tr -s ' ' |cut -d' ' -f14)
+	idetmftff=$(sed -n 3,3p $TEMPDIR/idet.grep |tr -s ' ' |cut -d' ' -f8)
+	idetmfbff=$(sed -n 3,3p $TEMPDIR/idet.grep |tr -s ' ' |cut -d' ' -f10)
+	idetmfprog=$(sed -n 3,3p $TEMPDIR/idet.grep |tr -s ' ' |cut -d' ' -f12)
+	idetmfundet=$(sed -n 3,3p $TEMPDIR/idet.grep |tr -s ' ' |cut -d' ' -f14)
 
 	echo "Non-repeating Frames: $idetneither" |tee -a "$logfile"
 	echo "Top Fields: $idettop" |tee -a "$logfile"
@@ -734,6 +746,7 @@ function checkinterlace {
 function process {
 	inname=$(echo "$file" |cut -d. -f1)
 	logtime="$(date +%s)"
+	tsfile="${inname}.smap"
 	echo "--------------------------------------------------"
 	echo "Working on file: $file" |tee -a "$PRELOG"
 	if [ $WRITELOGS = 1 ] && [ "$dryrun" != 1 ]; then
@@ -760,19 +773,22 @@ function process {
 			nomfrate="30FPS"
 		fi
 	else
-		if [ "$invres" -eq "576" ]; then
+		if [ -f "$tsfile" ]; then
+			nomfrate="Mix"
+			echo "Using existing segment map file: $tsfile" |tee -a "$logfile"
+		elif [ "$invres" -gt "523" ] && [ "$invres" -lt "633" ]; then
 			standard="PAL"
-			if [ "$(echo "$infrate > 24.5" |bc -l)" -eq 1 ] && [ "$(echo "$infrate < 25.5" |bc -l)" -eq 1 ]; then
+			if [ "$(echo "$infrate > 24.75" |bc -l)" -eq 1 ] && [ "$(echo "$infrate < 25.25" |bc -l)" -eq 1 ]; then
 				nomfrate="25FPS"
 			else
 				echo "ERROR: Unexpected PAL frame rate."
 				exit 1
 			fi
-		elif [ "$invres" -eq "480" ]; then
+		elif [ "$invres" -gt "432" ] && [ "$invres" -lt "523" ]; then
 			standard="NTSC"
-			if [ "$(echo "$infrate < 24.1" |bc -l)" -eq 1 ]; then
+			if [ "$(echo "$infrate >= 23.76" |bc -l)" -eq 1 ] && [ "$(echo "$infrate <= 24.24" |bc -l)" -eq 1 ]; then
 				nomfrate="24FPS"
-			elif [ "$(echo "$infrate > 29.9" |bc -l)" -eq 1 ]; then
+			elif [ "$(echo "$infrate >= 29.7" |bc -l)" -eq 1 ] && [ "$(echo "$infrate <= 30.3" |bc -l)" -eq 1 ]; then
 				nomfrate="30FPS"
 			else
 				nomfrate="Mix"
@@ -784,9 +800,11 @@ function process {
 	fi
 	echo "Nominal Frame Rate: $nomfrate" |tee -a "$logfile"
 
+	if [ ! -f "$tsfile" ]; then
+		checkinterlace
+	fi
 	if [ "$nomfrate" == "25FPS" ]; then
 	# I have low confidence in PAL diagnosis.
-		checkinterlace
 		if [ "$(echo "$pctintl < 80" |bc -l)" -eq 1 ]; then
 			echo "Diagnosis: PAL progressive video at 25FPS." |tee -a "$logfile"
 			sleep 5; echo
@@ -813,7 +831,6 @@ function process {
 			echo "$file: Soft Telecine 24FPS" >>diagreport.txt
 		fi
 	elif [ "$nomfrate" == "30FPS" ]; then
-		checkinterlace
 		if [ "$(echo "$pcthtc >= $HTCTHRESH" |bc -l)" -eq 1 ]; then
 			echo "Diagnosis: Hard telecined video at 24 FPS." |tee -a "$logfile"
 			sleep 5; echo
@@ -851,7 +868,7 @@ function process {
 			sleep 5; echo
 			if [ "$step" == "1" ]; then
 				if [ ! "$dryrun" = 1 ]; then
-					if [ ! -f "${inname}.smap" ] && [ "$AUTOMAP" == 1 ]; then
+					if [ ! -f "$tsfile" ] && [ "$AUTOMAP" == 1 ]; then
 						"$MAPPER" "$file"
 					fi
 					mixed
@@ -870,7 +887,7 @@ function process {
 		echo "Diagnosis: Mixed progressive, telecined, and/or interlaced video." |tee -a "$logfile"
 		sleep 5; echo
 		if [ ! "$dryrun" = 1 ]; then
-			if [ ! -f "${inname}.smap" ] && [ "$AUTOMAP" == 1 ]; then
+			if [ ! -f "$tsfile" ] && [ "$AUTOMAP" == 1 ]; then
 				"$MAPPER" "$file"
 			fi
 			mixed
@@ -892,19 +909,21 @@ function process {
 IFS=$'\n'
 dryrun=0
 rundir="$(pwd)"
-if [ "$1" == "-d" ]; then
-	dryrun=1
-	file=""
-	if [ "$2" != "" ]; then
-		file="$2"
-	fi
-fi
-if [ "$1" != "-d" ] && [ "$1" != "" ]; then
-	file="$1"
-fi
+
+while getopts ":i:o:s:m:d" flag; do
+	case "${flag}" in
+		i) file="${OPTARG}";;
+		o) OUTDIR="${OPTARG}";;
+		d) dryrun=1;;
+		s) dsegsize="${OPTARG}";;
+		m) dminseg="${OPTARG}";;
+		*) exit 1;;
+	esac
+done
+shift $((OPTIND-1))
+
 clifile="$file"
 if [ "$dryrun" = 1 ]; then
-	TEMPDIR="/dev/null"
 	LOGDIR="/dev/null"
 	STEP1DIR="/dev/null"
 	STEP2DIR="/dev/null"
@@ -912,17 +931,25 @@ if [ "$dryrun" = 1 ]; then
 fi
 setup
 reportsettings
+
+# Export variables shared with smap
+export dsegsize
+export dminseg
+export OUTDIR
+export TEMPROOT
+export TEMPDIR
+
 if [ "$file" != "" ]; then
 	if [ -f "$file" ]; then
 		echo "--------------------------------------------------"
 		echo "Starting drp run."
-		cleanup
 		infile="$file"
 		step=1
 		process
 		if [ "$MERGEMKV" == "1" ]; then
 			mergeinout
 		fi
+		cleanup
 	else
 		echo "ERROR: File not found."
 	fi
@@ -932,20 +959,25 @@ else
 		for file in $(ls -1 *.mkv); do
 			echo "--------------------------------------------------"
 			echo "Starting drp run."
-			cleanup
 			infile="$file"
 			step=1
 			process
+			if [ "$step" == "1" ] && [ "$SUDO_USER" ] && [ -f "outfile" ]; then
+				chown "$SUDO_USER" "$outfile"
+			fi
 			if [ "$MERGEMKV" == "1" ]; then
 				mergeinout
 			fi
 			cd "$rundir" || exit 1
+			cleanup
 		done
 	else
 		echo "ERROR: No MKV files found."
 	fi
 fi
-if [ "$dryrun" == "1" ] && [ "$SUDO_USER" ]; then
+if [ "$dryrun" == "1" ] && [ "$SUDO_USER" ] && [ -f "$rundir/diagreport.txt" ]; then
 	chown "$SUDO_USER" "$rundir/diagreport.txt"
+fi
+if [ "$dryrun" == "1" ] && [ "$SUDO_USER" ] && [ -f "$rundir/maplist.txt" ]; then
 	chown "$SUDO_USER" "$rundir/maplist.txt"
 fi

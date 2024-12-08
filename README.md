@@ -117,13 +117,17 @@ You can run them through bash, like 'bash drp' or 'bash smap', but if you want t
 
 | Command | Description |
 | --- | --- |
-| drp | Batch mode - it will try to convert every MKV file in the current directory. |
-| drp -d | Dry run batch mode - it will try to diagnose every MKV file and then exit. |
-| drp file | Single file mode - it will convert the named file only. |
-| drp -d file | Dry run single file - it will diagnose only the named file. |
-| smap file | Single file mode - it will create a segment map for the named file. |
+| **drp** | Batch mode - it will try to convert every MKV file in the current directory. |
+| **drp -d** | Dry run mode - it will try to diagnose every MKV file and then exit. |
+| **drp -i** file | Single file mode - it will diagnose and/or convert the named file only. |
+| **drp -o** directory | Override drp OUTDIR. |
+| **drp -s** value | Override smap SEGSIZE. |
+| **drp -m** value | Override smap MINSEG. |
+| **smap** file | Single file mode - it will create a segment map for the named file. |
 
 There are settings at the top of each script file that you can change.  They are explained in the comments.
+
+As of Dec 7, the script now creates a unique temp directory with each run, so it is possible to run more than one process of the script concurrently.  The only limits to the number of processes you can run simultaneously are processor power and memory (each process that uses the mapper will consume 8GB).
 
 #### Workflow
 
@@ -257,7 +261,26 @@ If enabled (1), which is now the default, the script will create an 8GB tmpfs me
 
 If the script crashes or you break out of it, you will need to manually unmount the filesystem, which you can do with the following command:
 
-sudo umount ~/00DRP/segments
+sudo umount ~/00DRP.*/segments
 
 (This command assumes that you have not changed OUTDIR.)
 
+## Tested Titles
+
+Notes on what I have tested with the script, with suggested settings.
+
+### Alfred Hitchcock Presents (1955)
+
+This is a pretty easy one.  Most episodes are mixed, but it is mostly just that the titles and credits that are hard telecined while the main feature is soft telecined.  All seven seasons ran successfully with default settings: SEGSIZE 0.1, MINSEG 3.  Season 7 was only available as a PAL set when I bought it, and that also worked well.
+
+### The Adventures of Brisco County Jr. (1993)
+
+The first episode is hard telecined, but the rest are all mixed.  This was one of my main testing shows.  Episodes vary in complexity, with some of the more special effects heavy episodes having more than thirty segments.  It ran successfully with default settings: SEGSIZE 0.1, MINSEG 3.
+
+### The Loner (1965)
+
+Hard telecined all the way through.  Ran successfully with default settings.
+
+### The Twilight Zone (1985)
+
+These episodes are mostly hard telecined, but a few are mixed to a crazy degree, with hundreds of frame rate transitions.  I can't imagine what the editing process was like.  The mixed episodes need a MINSEG of 1.5.
