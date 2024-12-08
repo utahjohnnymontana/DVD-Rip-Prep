@@ -277,7 +277,7 @@ This is a pretty easy one.  Most episodes are mixed, but it is mostly just that 
 
 ### The Adventures of Brisco County Jr. (1993)
 
-The first episode is hard telecined, but the rest are all mixed.  This was one of my main testing shows.  Episodes vary in complexity, with some of the more special effects heavy episodes having more than thirty segments.  It ran successfully with default settings: SEGSIZE 0.1, MINSEG 3.
+The first episode is hard telecined, but the rest are all mixed.  Episodes vary in complexity, with some of the more special effects heavy episodes having more than thirty segments.  It ran successfully with default settings: SEGSIZE 0.1, MINSEG 3.
 
 ### Alien Nation (1989)
 
@@ -285,7 +285,7 @@ This one is mostly mixed episodes, with a few hard telecined.  Everything but ep
 
 ### Beasts (1976)
 
-PAL format, non-interlaced.  These ran just fine with the default settings.
+PAL format, non-interlaced.  These ran just fine with the default settings and PAL conversion.
 
 ### Bonanza (1959)
 
@@ -293,7 +293,7 @@ Season 1 is mostly hard telecined with a few mixed episodes.  All ran successful
 
 ### The Loner (1965)
 
-Hard telecined all the way through.  Ran successfully with default settings: SEGSIZE 0.1, MINSEG 3.
+Hard telecined all the way through.  Ran successfully with default settings.
 
 ### The Twilight Zone (1985)
 
