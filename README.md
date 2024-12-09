@@ -120,11 +120,11 @@ You can run them through bash, like 'bash drp' or 'bash smap', but if you want t
 | --- | --- |
 | **drp** | Batch mode - it will try to convert every MKV file in the current directory. |
 | **drp -d** | Dry run mode - it will try to diagnose every MKV file and then exit. |
+| **drp -f** value | Override drp FIXRATE |
 | **drp -i** file | Single file mode - it will diagnose and/or convert the named file only. |
+| **drp -m** value | Override smap MINSEG. |
 | **drp -o** directory | Override drp OUTDIR. |
 | **drp -s** value | Override smap SEGSIZE. |
-| **drp -m** value | Override smap MINSEG. |
-| **drp -f** value | Override drp FIXRATE. |
 | **smap** file | Single file mode - it will create a segment map for the named file. |
 
 There are settings at the top of each script file that you can change.  They are explained in the comments.
@@ -281,7 +281,7 @@ The first episode is hard telecined, but the rest are all mixed.  Episodes vary 
 
 ### Alien Nation (1989)
 
-This one is mostly mixed episodes, with a few hard telecined.  Everything but episode 1 ran just fine with default settings of SEGSIZE 0.1, MINSEG 3.  Episode 1 has an inseparable mix of hard telecine and interlaced material and needed to be processed at FIXRATE 2 (120FPS) to preserve motion.
+This one is mostly mixed episodes, with a few hard telecined.  Everything but episode 1 ran successfully with settings of SEGSIZE 0.1, MINSEG 1.  Episode 1 has an inseparable mix of hard telecine and interlaced material and needed to be processed at FIXRATE 2 (120FPS) to preserve motion.  On all the other episodes, there is a very brief group of stutters in the first part of the intro, which could be corrected by running every episode at FIXRATE 2.  It is not worth it to me to convert every episode to 120FPS to fix about one second of video, but you can do it if it matters to you.
 
 ### Beasts (1976)
 
@@ -297,7 +297,11 @@ Hard telecined all the way through.  Ran successfully with default settings.
 
 ### The Twilight Zone (1985)
 
-These episodes are mostly hard telecined, but a few are mixed to a crazy degree, with hundreds of frame rate transitions.  I can't imagine what the editing process was like.  The mixed episodes need a MINSEG of 1.
+These episodes are mostly hard telecined, but a few are mixed to a crazy degree, with hundreds of frame rate transitions.  Episode 1&2 has 323 segments and took more than a day to process!  I can't imagine what the editing process was like.  The mixed episodes need a MINSEG of 1.
+
+### The Virginian (1962)
+
+Hard telecined all the way through.  Ran successfully with default settings.
 
 ### Wagon Train (1957)
 
