@@ -205,7 +205,11 @@ What to do when a file contains more than one true frame rate.  That is, after a
 1 - Reduce the frame rate to 24 FPS by dropping frames from 30FPS segments.  
 2 - Increase all segments to 120 FPS by quintupling 24 and quadrupling 30.  
 
+FIXRATE can also be overridden with the command line switch -f.  So, "-f 2", for example, will trigger FIXRATE 2 without editing the settings.
+
 The default of 1 works well for most of my library, in which 30FPS sections tend to be short, but it does drop frames to get the lower frame rate, so it is destructive.  In videos that have substantial 30 FPS segments, 2 would be  a better approach.  2 is always the lossless approach, but 120 FPS videos might not play on everything.  FIXRATE 2 is also still new/experimental and does not always work well for reasons that I don't understand.  FIXRATE 0 will just output the segment files at their native frame rates and you can decide what to do with them.
+
+More advice for FIXRATE 2: You only need it for mixed videos.  Single method videos will be output at their true frame rates already.  You don't always need it for mixed rate videos.  A lot of mixed videos only mix soft and hard telecine and will be output most appropriately at 24 FPS.  FIXRATE 2 becomes useful when there is true interlaced content mixed with telecined content.  Whenever this combination occurs, it is not a bad idea to at least try FIXRATE 2 for comparison.  Whenever this combination occurs and you see stutters in the output, then this should fix it.  The downsides to FIXRATE 2 are that the higher frame rate produces a slightly larger file (although not linearly, since the extra frames are duplicates) and that it takes longer to upscale.
 
 #### HTCTHRESH
 
@@ -225,7 +229,9 @@ By default, the script outputs a file containing only the video track, as this s
 
 #### OUTDIR
 
-This is the directory that you want the script to use for its output and working directories.  Default is your home directory (~).
+This is the directory that you want the script to use for its output and working directories.  There is no longer a default setting, due to the complexities of sometimes needing to run the script with sudo.  Instead, if you have not set the directory, the script will prompt you and exit.
+
+OUTDIR can also be overridden with the command line switch -o.  So, "-o /home/johndoe", for example, will use the specified directory for output.
 
 #### OUTPUTJOIN
 
@@ -253,6 +259,8 @@ If enabled (1), then the memory filesystem will not be unmounted at the end of t
 
 Segments shorter than MINSEG will be ignored.  Very short segments may be false positives or inconsequential parts like black screen transitions that will lose nothing as a result of dropped frames.  There is no right answer when it comes to this setting.  0.5 is the shortest practical setting and should catch just about everything, but I've found that 3 is a better default.  You might think that the smallest possible value would give the best result, but the transitions between frame rates are not always clean, which means that very short segments are the most likely to be misdiagnosed.  It almost always does less harm for transitions to get processed with the leading or following segment.  I do occasionally run across content that needs a lower MINSEG though.  If you find that you just can't get a good audio sync, try adjusting this to 2 or 1.
 
+MINSEG can also be overridden with the drp command line switch -m.  So, "-m 1", for example, will trigger MINSEG with a value of 1 second without editing the settings.
+
 #### OUTDIR
 
 This is the directory that you want the script to use for its output and working directories.  Default is your home directory (~).
@@ -260,6 +268,8 @@ This is the directory that you want the script to use for its output and working
 #### SEGSIZE
 
 How finely should the script slice the video for analysis?  The default time of 0.1 effectively instructs ffmpeg to make the smallest possible segments.  Usually, the smallest that ffmpeg will actually produce is about 1/3 second.  Small values will catch brief, but real, transitions at the cost of significantly increased processing time.  Whether those short segments exist in the content you are analyzing is uncertain and whether or not you care about potentially missing a few interlaced frames is a matter of preference.  If your video has no short segments, you can increase the value for faster mapping.
+
+SEGSIZE can also be overridden with the command line switch -s.  So, "-s 1", for example, will trigger SEGSIZE with a value of 1 second without editing the settings.
 
 #### USERAMDISK
 
