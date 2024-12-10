@@ -22,7 +22,7 @@ FIXRATE=1
 RATELOCK="0.005"
 AUTOMAP=1
 MAPPER="$(dirname "$0")/smap"
-OUTDIR="~"
+OUTDIR="CHANGEME"
 
 # Best not to change the following settings unless you know what you're doing
 TEMPROOT="$OUTDIR/00DRP"
@@ -972,6 +972,11 @@ function process {
 IFS=$'\n'
 dryrun=0
 rundir="$(pwd)"
+
+if [ "$OUTDIR" == "CHANGEME" ]; then
+	echo "ERROR: You need to set OUTDIR to your output directory at the top of the script."
+	exit 1
+fi
 
 while getopts ":i:o:s:m:d:f:" flag; do
 	case "${flag}" in

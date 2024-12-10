@@ -1,5 +1,5 @@
 #!/bin/bash
-# smap (Segment Mapper) bash script - Dec. 8 2024
+# smap (Segment Mapper) bash script - Dec. 9 2024
 #
 # This script attempts to analyze an MKV file produced by MakeMKV from a DVD 
 # source and find where the original frame rates change in the video.  It
@@ -13,7 +13,7 @@ MINSEG="3"
 
 # Set directories if not exported from drp (i.e. if not running smap directly)
 if [ ! "$OUTDIR" ]; then
-	OUTDIR="~"
+	OUTDIR="CHANGEME"
 fi
 if [ ! "$TEMPROOT" ]; then
 	TEMPROOT="$OUTDIR/00DRP"
@@ -342,6 +342,11 @@ function makemap {
 
 IFS=$'\n'
 rundir="$(pwd)"
+
+if [ "$OUTDIR" == "CHANGEME" ]; then
+	echo "ERROR: You need to set OUTDIR to your output directory at the top of the script."
+	exit 1
+fi
 
 infile="$1"
 infilename="$(echo $infile |cut -d. -f1)"
