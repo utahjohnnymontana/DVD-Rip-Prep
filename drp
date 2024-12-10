@@ -390,7 +390,7 @@ function harddi {
 			-hide_banner \
 			-v warning \
 			-stats \
-			-i "$intfile" \
+			-i "$file" \
 			-an -sn \
 			-r 120000/1001 \
 			-c:v ffv1 "$outfile"
@@ -467,7 +467,7 @@ function softtelecine {
 			-hide_banner \
 			-v warning \
 			-stats \
-			-i "$intfile" \
+			-i "$file" \
 			-an -sn \
 			-r 120000/1001 \
 			-c:v ffv1 "$outfile"
@@ -658,7 +658,7 @@ function ntscinterlaced {
 			-hide_banner \
 			-v warning \
 			-stats \
-			-i "$intfile" \
+			-i "$file" \
 			-an -sn \
 			-r 120000/1001 \
 			-c:v ffv1 "$outfile"
