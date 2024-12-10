@@ -22,7 +22,7 @@ FIXRATE=1
 RATELOCK="0.005"
 AUTOMAP=1
 MAPPER="$(dirname "$0")/smap"
-OUTDIR="~"
+OUTDIR="CHANGEME"
 
 # Best not to change the following settings unless you know what you're doing
 TEMPROOT="$OUTDIR/00DRP"
