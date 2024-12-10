@@ -285,7 +285,7 @@ The first episode is hard telecined, but the rest are all mixed.  Episodes vary 
 
 ### Alien Nation (1989)
 
-This one is mostly mixed episodes, with a few hard telecined.  Everything but episode 1 ran successfully with settings of SEGSIZE 0.1, MINSEG 1.  Episode 1 has an inseparable mix of hard telecine and interlaced material and needed to be processed at FIXRATE 2 (120FPS) to preserve motion.  On all the other episodes, there is a very brief group of stutters in the first part of the intro, which could be corrected by running every episode at FIXRATE 2.  It is not worth it to me to convert every episode to 120FPS to fix about one second of video, but you can do it if it matters to you.
+This one is mostly mixed episodes, with a few hard telecined.  Because most of them have interlaced content joined to hard telecine, which the script cannot distinguish, it is best to run these at FIXRATE 2 (120FPS) to preserve normal motion.
 
 ### Beasts (1976)
 
@@ -298,6 +298,10 @@ Season 1 is mostly hard telecined with a few mixed episodes.  All ran successful
 ### The Loner (1965)
 
 Hard telecined all the way through.  Ran successfully with default settings.
+
+### The Simpsons (1989)
+
+Some episodes are mixed.  Others are diagnosed as hard telecined, but they show evidence of having some full interlacing mixed in.  Luckily, that is handled by the hard telecine method, which marks interlaced frames and then deinterlaces them following inverse telecine.  So, everything works fine with the default settings.
 
 ### The Twilight Zone (1985)
 

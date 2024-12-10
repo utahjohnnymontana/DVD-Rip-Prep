@@ -22,7 +22,7 @@ FIXRATE=1
 RATELOCK="0.005"
 AUTOMAP=1
 MAPPER="$(dirname "$0")/smap"
-OUTDIR="CHANGEME"
+OUTDIR="~"
 
 # Best not to change the following settings unless you know what you're doing
 TEMPROOT="$OUTDIR/00DRP"
@@ -392,6 +392,7 @@ function harddi {
 			-stats \
 			-i "$file" \
 			-an -sn \
+			-vf "bwdif=mode=send_field:deint=all,mpdecimate=hi=200:lo=200:frac=1:max=0" \
 			-r 120000/1001 \
 			-c:v ffv1 "$outfile"
 	elif [ "$FIXRATE" == "1" ]; then
@@ -660,6 +661,7 @@ function ntscinterlaced {
 			-stats \
 			-i "$file" \
 			-an -sn \
+			-vf "bwdif=mode=send_field" \
 			-r 120000/1001 \
 			-c:v ffv1 "$outfile"
 	elif [ "$FIXRATE" == "1" ]; then
