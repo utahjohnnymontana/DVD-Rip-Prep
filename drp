@@ -1,5 +1,5 @@
 #!/bin/bash
-# drp (DVD Rip Prep) bash script - Dec. 8 2024
+# drp (DVD Rip Prep) bash script - Dec. 9 2024
 #
 # This script attempts to take an MKV file produced by MakeMKV from a DVD source
 # and output a new file without telecine or interlacing and at the correct frame
@@ -12,13 +12,14 @@
 # Settings
 WRITELOGS=1
 CONVPAL=1
-ALLOWLOSS="0.04"
+ALLOWLOSS="0.07"
 HTCTHRESH="2.5"
 INTLTHRESH="50"
 OUTPUTJOIN=1
 OUTPUTSEGS=0
 MERGEMKV=1
 FIXRATE=1
+RATELOCK="0.005"
 AUTOMAP=1
 MAPPER="$(dirname "$0")/smap"
 OUTDIR="~"
@@ -282,18 +283,15 @@ function palprogressive {
 }
 
 function hardtelecine {
-	outname="${inname}-24fps-hdtc-ffv1.mkv"
-	intname="${inname}-24fps-hdtc-ffv1-int.mkv"
-	if [ "$step" = 1 ]; then
-		outfile="$OUTDIR/$outname"
-		intfile="$OUTDIR/$intname"
-	elif [ "$step" = 3 ]; then
-		outfile="$STEP3DIR/$outname"
-		intfile="$STEP3DIR/$intname"
-	else
-		echo "ERROR: Input step does not make sense.  This is probably a bug."
-	fi
-	if [ "$FIXRATE" == "2" ] && [ "$step" != "1" ]; then
+	if [ "$FIXRATE" == "2" ]; then
+		outname="${inname}-120fps-hdtc-ffv1.mkv"
+		if [ "$step" = 1 ]; then
+			outfile="$OUTDIR/$outname"
+		elif [ "$step" = 3 ]; then
+			outfile="$STEP3DIR/$outname"
+		else
+			echo "ERROR: Input step does not make sense.  This is probably a bug."
+		fi
 		ffmpeg -n \
 			-hide_banner \
 			-v warning \
@@ -302,8 +300,19 @@ function hardtelecine {
 			-an -sn \
 			-vf "fieldmatch,decimate,bwdif=mode=send_field:deint=interlaced" \
 			-r 120000/1001 \
-			-c:v ffv1 "$intfile"
+			-c:v ffv1 "$outfile"
 	else
+		outname="${inname}-24fps-hdtc-ffv1.mkv"
+		intname="${inname}-24fps-hdtc-ffv1-int.mkv"
+		if [ "$step" = 1 ]; then
+			outfile="$OUTDIR/$outname"
+			intfile="$OUTDIR/$intname"
+		elif [ "$step" = 3 ]; then
+			outfile="$STEP3DIR/$outname"
+			intfile="$STEP3DIR/$intname"
+		else
+			echo "ERROR: Input step does not make sense.  This is probably a bug."
+		fi
 		ffmpeg -n \
 			-hide_banner \
 			-v warning \
@@ -368,27 +377,15 @@ function harddi {
 	# HardDI is potentially destructive and only gets called as a last resort.
 	# Can't find the right pattern in this video, so just deinterlace it and 
 	# then drop frames that are very similar to hopfully correct motion.
-	outname="${inname}-24fps-harddi-ffv1.mkv"
-	intname="${inname}-24fps-harddi-ffv1-int.mkv"
-	if [ "$step" = 1 ]; then
-		outfile="$OUTDIR/$outname"
-		intfile="$OUTDIR/$intname"
-	elif [ "$step" = 3 ]; then
-		outfile="$STEP3DIR/$outname"
-		intfile="$STEP3DIR/$intname"
-	else
-		echo "ERROR: Input step does not make sense.  This is probably a bug."
-	fi
 	if [ "$FIXRATE" == "2" ]; then
-		ffmpeg -n \
-			-hide_banner \
-			-v warning \
-			-stats \
-			-i "$file" \
-			-an -sn \
-			-vf "bwdif=mode=send_field:deint=all,mpdecimate=hi=200:lo=200:frac=1:max=0" \
-			-r 30000/1001 \
-			-c:v ffv1 "$intfile"
+		outname="${inname}-120fps-harddi-ffv1.mkv"
+		if [ "$step" = 1 ]; then
+			outfile="$OUTDIR/$outname"
+		elif [ "$step" = 3 ]; then
+			outfile="$STEP3DIR/$outname"
+		else
+			echo "ERROR: Input step does not make sense.  This is probably a bug."
+		fi
 		ffmpeg -n \
 			-hide_banner \
 			-v warning \
@@ -398,6 +395,14 @@ function harddi {
 			-r 120000/1001 \
 			-c:v ffv1 "$outfile"
 	elif [ "$FIXRATE" == "1" ]; then
+		outname="${inname}-24fps-harddi-ffv1.mkv"
+		if [ "$step" = 1 ]; then
+			outfile="$OUTDIR/$outname"
+		elif [ "$step" = 3 ]; then
+			outfile="$STEP3DIR/$outname"
+		else
+			echo "ERROR: Input step does not make sense.  This is probably a bug."
+		fi
 		ffmpeg -n \
 			-hide_banner \
 			-v warning \
@@ -408,6 +413,14 @@ function harddi {
 			-r 24000/1001 \
 			-c:v ffv1 "$outfile"
 	else
+		outname="${inname}-30fps-harddi-ffv1.mkv"
+		if [ "$step" = 1 ]; then
+			outfile="$OUTDIR/$outname"
+		elif [ "$step" = 3 ]; then
+			outfile="$STEP3DIR/$outname"
+		else
+			echo "ERROR: Input step does not make sense.  This is probably a bug."
+		fi
 		ffmpeg -n \
 			-hide_banner \
 			-v warning \
@@ -441,43 +454,40 @@ function mixed {
 }
 
 function softtelecine {
-	outname="${inname}-24fps-sdtc-ffv1.mkv"
-	intname="${inname}-24fps-sdtc-ffv1-int.mkv"
-	if [ "$step" = 1 ]; then
-		outfile="$OUTDIR/$outname"
-		intfile="$OUTDIR/$intname"
-	elif [ "$step" = 3 ]; then
-		outfile="$STEP3DIR/$outname"
-		intfile="$STEP3DIR/$intname"
+	if [ "$FIXRATE" == "2" ]; then
+		outname="${inname}-120fps-sdtc-ffv1.mkv"
+		if [ "$step" = 1 ]; then
+			outfile="$OUTDIR/$outname"
+		elif [ "$step" = 3 ]; then
+			outfile="$STEP3DIR/$outname"
+		else
+			echo "ERROR: Input step does not make sense.  This is probably a bug."
+		fi
+		ffmpeg -n \
+			-hide_banner \
+			-v warning \
+			-stats \
+			-i "$intfile" \
+			-an -sn \
+			-r 120000/1001 \
+			-c:v ffv1 "$outfile"
 	else
-		echo "ERROR: Input step does not make sense.  This is probably a bug."
-	fi
-	if [ "$FIXRATE" == "2" ] && [ "$step" != "1" ]; then
-	ffmpeg -n \
-		-hide_banner \
-		-v warning \
-		-stats \
-		-i "$file" \
-		-an -sn \
-		-r 24000/1001 \
-		-c:v ffv1 "$intfile"
-	ffmpeg -n \
-		-hide_banner \
-		-v warning \
-		-stats \
-		-i "$intfile" \
-		-an -sn \
-		-r 120000/1001 \
-		-c:v ffv1 "$outfile"
-	else
-	ffmpeg -n \
-		-hide_banner \
-		-v warning \
-		-stats \
-		-i "$file" \
-		-an -sn \
-		-r 24000/1001 \
-		-c:v ffv1 "$outfile"
+		outname="${inname}-24fps-sdtc-ffv1.mkv"
+		if [ "$step" = 1 ]; then
+			outfile="$OUTDIR/$outname"
+		elif [ "$step" = 3 ]; then
+			outfile="$STEP3DIR/$outname"
+		else
+			echo "ERROR: Input step does not make sense.  This is probably a bug."
+		fi
+		ffmpeg -n \
+			-hide_banner \
+			-v warning \
+			-stats \
+			-i "$file" \
+			-an -sn \
+			-r 24000/1001 \
+			-c:v ffv1 "$outfile"
 	fi
 	checkduration "$file" "$outfile"
 	if [ "$tryalt" -eq "1" ]; then
@@ -635,38 +645,34 @@ function prepsegments {
 }
 
 function ntscinterlaced {
-	outname="${inname}-30fps-deint-ffv1.mkv"
-	intname="${inname}-30fps-deint-ffv1-int.mkv"
-	if [ "$step" = 1 ]; then
-		outfile="$OUTDIR/$outname"
-		intfile="$OUTDIR/$intname"
-	elif [ "$step" = 3 ]; then
-		outfile="$STEP3DIR/$outname"
-		intfile="$STEP3DIR/$intname"
-	else
-		echo "ERROR: Input step does not make sense.  This is probably a bug."
-	fi
-	if [ "$FIXRATE" == "2" ] && [ "$step" != "1" ]; then
-			ffmpeg -n \
-				-hide_banner \
-				-v warning \
-				-stats \
-				-i "$file" \
-				-an -sn \
-				-vf "bwdif=mode=send_field" \
-				-r 30000/1001 \
-				-c:v ffv1 "$intfile"
-			ffmpeg -n \
-				-hide_banner \
-				-v warning \
-				-stats \
-				-i "$intfile" \
-				-an -sn \
-				-r 120000/1001 \
-				-c:v ffv1 "$outfile"
+	if [ "$FIXRATE" == "2" ]; then
+		outname="${inname}-120fps-deint-ffv1.mkv"
+		if [ "$step" = 1 ]; then
+			outfile="$OUTDIR/$outname"
+		elif [ "$step" = 3 ]; then
+			outfile="$STEP3DIR/$outname"
+		else
+			echo "ERROR: Input step does not make sense.  This is probably a bug."
+		fi
+		ffmpeg -n \
+			-hide_banner \
+			-v warning \
+			-stats \
+			-i "$intfile" \
+			-an -sn \
+			-r 120000/1001 \
+			-c:v ffv1 "$outfile"
 	elif [ "$FIXRATE" == "1" ]; then
 		# If the whole video is interlaced, keep it at 30FPS, otherwise, reduce to 24FPS.
 		if [ "$step" == 1 ]; then
+			outname="${inname}-30fps-deint-ffv1.mkv"
+			if [ "$step" = 1 ]; then
+				outfile="$OUTDIR/$outname"
+			elif [ "$step" = 3 ]; then
+				outfile="$STEP3DIR/$outname"
+			else
+				echo "ERROR: Input step does not make sense.  This is probably a bug."
+			fi
 			ffmpeg -n \
 				-hide_banner \
 				-v warning \
@@ -677,6 +683,14 @@ function ntscinterlaced {
 				-r 30000/1001 \
 				-c:v ffv1 "$outfile"
 		else
+			outname="${inname}-24fps-deint-ffv1.mkv"
+			if [ "$step" = 1 ]; then
+				outfile="$OUTDIR/$outname"
+			elif [ "$step" = 3 ]; then
+				outfile="$STEP3DIR/$outname"
+			else
+				echo "ERROR: Input step does not make sense.  This is probably a bug."
+			fi
 			ffmpeg -n \
 				-hide_banner \
 				-v warning \
@@ -688,6 +702,14 @@ function ntscinterlaced {
 				-c:v ffv1 "$outfile"
 		fi
 	else
+		outname="${inname}-30fps-deint-ffv1.mkv"
+		if [ "$step" = 1 ]; then
+			outfile="$OUTDIR/$outname"
+		elif [ "$step" = 3 ]; then
+			outfile="$STEP3DIR/$outname"
+		else
+			echo "ERROR: Input step does not make sense.  This is probably a bug."
+		fi
 		ffmpeg -n \
 			-hide_banner \
 			-v warning \
@@ -800,12 +822,18 @@ function process {
 			nomfrate="30FPS"
 		fi
 	else
+		pallow="$(echo "25 - ($RATELOCK * 25)" |bc -l)"
+		palhigh="$(echo "25 + ($RATELOCK * 25)" |bc -l)"
+		filmlow="$(echo "24 - ($RATELOCK * 24)" |bc -l)"
+		filmhigh="$(echo "24 + ($RATELOCK * 24)" |bc -l)"
+		vidlow="$(echo "30 - ($RATELOCK * 30)" |bc -l)"
+		vidhigh="$(echo "30 + ($RATELOCK * 30)" |bc -l)"
 		if [ -f "$tsfile" ]; then
 			nomfrate="Mix"
 			echo "Using existing segment map file: $tsfile" |tee -a "$logfile"
 		elif [ "$invres" -gt "523" ] && [ "$invres" -lt "633" ]; then
 			standard="PAL"
-			if [ "$(echo "$infrate > 24.75" |bc -l)" -eq 1 ] && [ "$(echo "$infrate < 25.25" |bc -l)" -eq 1 ]; then
+			if [ "$(echo "$infrate > $pallow" |bc -l)" -eq 1 ] && [ "$(echo "$infrate < $palhigh" |bc -l)" -eq 1 ]; then
 				nomfrate="25FPS"
 			else
 				echo "ERROR: Unexpected PAL frame rate."
@@ -813,9 +841,9 @@ function process {
 			fi
 		elif [ "$invres" -gt "432" ] && [ "$invres" -lt "523" ]; then
 			standard="NTSC"
-			if [ "$(echo "$infrate >= 23.76" |bc -l)" -eq 1 ] && [ "$(echo "$infrate <= 24.24" |bc -l)" -eq 1 ]; then
+			if [ "$(echo "$infrate >= $filmlow" |bc -l)" -eq 1 ] && [ "$(echo "$infrate <= $filmhigh" |bc -l)" -eq 1 ]; then
 				nomfrate="24FPS"
-			elif [ "$(echo "$infrate >= 29.7" |bc -l)" -eq 1 ] && [ "$(echo "$infrate <= 30.3" |bc -l)" -eq 1 ]; then
+			elif [ "$(echo "$infrate >= $vidlow" |bc -l)" -eq 1 ] && [ "$(echo "$infrate <= $vidhigh" |bc -l)" -eq 1 ]; then
 				nomfrate="30FPS"
 			else
 				nomfrate="Mix"
@@ -945,7 +973,7 @@ IFS=$'\n'
 dryrun=0
 rundir="$(pwd)"
 
-while getopts ":i:o:s:m:d" flag; do
+while getopts ":i:o:s:m:d:f:" flag; do
 	case "${flag}" in
 		i) file="${OPTARG}";;
 		o) OUTDIR="${OPTARG}";;

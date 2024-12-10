@@ -183,9 +183,9 @@ The settings are found at the top of each of the script files.
 
 #### ALLOWLOSS
 
-The more invasive the method used by the script, the more likely that the runtime of the video will change.  Usually, it ends up slightly shorter due to dropped frames, but occasionally it will also run slightly longer, so this setting really refers to runtime change, not just loss.  In most cases, the difference is small enough that it does not matter, but a big enough change will result in audio that is out of sync.  Videos that change by more than ALLOWLOSS will be renamed to indicate the time difference.  Also, segments that change by more than this amount may be retried with an alternate method to see if it produces a better result.  This is a percentage, so the default value allows a change of 1.44 seconds per hour of video.
+The more invasive the method used by the script, the more likely that the runtime of the video will change.  Usually, it ends up slightly shorter due to dropped frames, but occasionally it will also run slightly longer, so this setting really refers to runtime change, not just loss.  In most cases, the difference is small enough that it does not matter, but a big enough change will result in audio that is out of sync.  Videos that change by more than ALLOWLOSS will be renamed to indicate the time difference.  Also, segments that change by more than this amount may be retried with an alternate method to see if it produces a better result.  This is a percentage, so the default value allows a change of 2.5 seconds per hour of video.  That might seem like a lot, but that much difference is only ever likely to result on short segments, not on the full runtime of the video.
 
-Default is 0.04.
+Default is 0.07.
 
 #### AUTOMAP
 
@@ -201,9 +201,9 @@ Set to 1 to enable PAL conversion or 0 to disable it.  Default is enabled (1).
 
 What to do when a file contains more than one true frame rate.  That is, after applying detelecine, do we now have a mix of 24FPS video and deinterlaced 30 FPS video?  If so, the script can:
 
-0 - Do nothing.  If you set this to zero, then OUTPUTSEGS should be 1.
-1 - Reduce the frame rate to 24 FPS by dropping frames from 30FPS segments.
-2 - Increase all segments to 120 FPS by quintupling 24 and quadrupling 30.
+0 - Do nothing.  If you set this to zero, then OUTPUTSEGS should be 1.  
+1 - Reduce the frame rate to 24 FPS by dropping frames from 30FPS segments.  
+2 - Increase all segments to 120 FPS by quintupling 24 and quadrupling 30.  
 
 The default of 1 works well for most of my library, in which 30FPS sections tend to be short, but it does drop frames to get the lower frame rate, so it is destructive.  In videos that have substantial 30 FPS segments, 2 would be  a better approach.  2 is always the lossless approach, but 120 FPS videos might not play on everything.  FIXRATE 2 is also still new/experimental and does not always work well for reasons that I don't understand.  FIXRATE 0 will just output the segment files at their native frame rates and you can decide what to do with them.
 
@@ -234,6 +234,10 @@ If enabled, the script will output a rejoined output file when the mixed process
 #### OUTPUTSEGS
 
 If enabled, the script will output the processed segments when the mixed process was used.  You might want to output the segments if you would like to upscale them separately.  This can be used in combination with OUTPUTJOIN.  Default is disabled (0).
+
+#### RATELOCK
+
+RATELOCK determines how far the frame rate can diverge from the nominal rate and still be treated by the script as having that nominal frame rate.  The default is 0.005, which translates, for example, into a film rate range of 23.88 to 24.12.  This allows the script to ignore a maximum of about 15 seconds of material that is not at the predominant frame rate.  The original RATELOCK setting was 0.01 and that is still a reasonable setting if you are not too particular about dropping frames from 30FPS sections that probably only occur in titles or credits.  0.002 is about the lowest/most strict that you might want to try, but the result will be running a lot of things through the much slower mixed process when they don't really need it.  You could reasonably go as high as 0.05 if your goal is to ignore 30FPS titles and credits that amount to a couple minutes of runtime.
 
 #### WRITELOGS
 
