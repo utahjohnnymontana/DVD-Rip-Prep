@@ -1,5 +1,5 @@
 #!/bin/bash
-# drp (DVD Rip Prep) bash script - Dec. 9 2024
+# drp (DVD Rip Prep) bash script - Dec. 10 2024
 #
 # This script attempts to take an MKV file produced by MakeMKV from a DVD source
 # and output a new file without telecine or interlacing and at the correct frame
@@ -283,46 +283,25 @@ function palprogressive {
 }
 
 function hardtelecine {
-	if [ "$FIXRATE" == "2" ]; then
-		outname="${inname}-120fps-hdtc-ffv1.mkv"
-		if [ "$step" = 1 ]; then
-			outfile="$OUTDIR/$outname"
-		elif [ "$step" = 3 ]; then
-			outfile="$STEP3DIR/$outname"
-		else
-			echo "ERROR: Input step does not make sense.  This is probably a bug."
-		fi
-		ffmpeg -n \
-			-hide_banner \
-			-v warning \
-			-stats \
-			-i "$file" \
-			-an -sn \
-			-vf "fieldmatch,decimate,bwdif=mode=send_field:deint=interlaced" \
-			-r 120000/1001 \
-			-c:v ffv1 "$outfile"
+	outname="${inname}-24fps-hdtc-ffv1.mkv"
+	if [ "$step" = 1 ]; then
+		outfile="$OUTDIR/$outname"
+		intfile="$OUTDIR/$intname"
+	elif [ "$step" = 3 ]; then
+		outfile="$STEP3DIR/$outname"
+		intfile="$STEP3DIR/$intname"
 	else
-		outname="${inname}-24fps-hdtc-ffv1.mkv"
-		intname="${inname}-24fps-hdtc-ffv1-int.mkv"
-		if [ "$step" = 1 ]; then
-			outfile="$OUTDIR/$outname"
-			intfile="$OUTDIR/$intname"
-		elif [ "$step" = 3 ]; then
-			outfile="$STEP3DIR/$outname"
-			intfile="$STEP3DIR/$intname"
-		else
-			echo "ERROR: Input step does not make sense.  This is probably a bug."
-		fi
-		ffmpeg -n \
-			-hide_banner \
-			-v warning \
-			-stats \
-			-i "$file" \
-			-an -sn \
-			-vf "fieldmatch,decimate,bwdif=mode=send_field:deint=interlaced" \
-			-r 24000/1001 \
-			-c:v ffv1 "$outfile"
+		echo "ERROR: Input step does not make sense.  This is probably a bug."
 	fi
+	ffmpeg -n \
+		-hide_banner \
+		-v warning \
+		-stats \
+		-i "$file" \
+		-an -sn \
+		-vf "fieldmatch,decimate,bwdif=mode=send_field:deint=interlaced" \
+		-r 24000/1001 \
+		-c:v ffv1 "$outfile"
 	checkduration "$file" "$outfile"
 	if [ "$tryalt" -eq "1" ]; then
 		outnamea="$outname"
@@ -348,13 +327,10 @@ function hardmix {
 	# interlaced frames and preserve correct motion.
 	# This is a step 1 only method.  Segments will go to Hard DI instead.
 	outname="${inname}-120fps-hdtc-di-ffv1.mkv"
-	intname="${inname}-120fps-hdtc-di-ffv1-int.mkv"
 	if [ "$step" = 1 ]; then
 		outfile="$OUTDIR/$outname"
-		intfile="$OUTDIR/$intname"
 	elif [ "$step" = 3 ]; then
 		outfile="$STEP3DIR/$outname"
-		intfile="$STEP3DIR/$intname"
 	else
 		echo "ERROR: Input step does not make sense.  This is probably a bug."
 	fi
@@ -364,7 +340,7 @@ function hardmix {
 		-stats \
 		-i "$file" \
 		-an -sn \
-		-vf "bwdif=mode=send_frame:deint=all" \
+		-vf "fieldmatch=mode=pc,bwdif=mode=send_field:parity=auto:deint=interlaced" \
 		-r 120000/1001 \
 		-c:v ffv1 "$outfile"
 	checkduration "$file" "$outfile"
@@ -374,46 +350,7 @@ function hardmix {
 }
 
 function harddi {
-	# HardDI is potentially destructive and only gets called as a last resort.
-	# Can't find the right pattern in this video, so just deinterlace it and 
-	# then drop frames that are very similar to hopfully correct motion.
-	if [ "$FIXRATE" == "2" ]; then
-		outname="${inname}-120fps-harddi-ffv1.mkv"
-		if [ "$step" = 1 ]; then
-			outfile="$OUTDIR/$outname"
-		elif [ "$step" = 3 ]; then
-			outfile="$STEP3DIR/$outname"
-		else
-			echo "ERROR: Input step does not make sense.  This is probably a bug."
-		fi
-		ffmpeg -n \
-			-hide_banner \
-			-v warning \
-			-stats \
-			-i "$file" \
-			-an -sn \
-			-vf "bwdif=mode=send_field:deint=all,mpdecimate=hi=200:lo=200:frac=1:max=0" \
-			-r 120000/1001 \
-			-c:v ffv1 "$outfile"
-	elif [ "$FIXRATE" == "1" ]; then
-		outname="${inname}-24fps-harddi-ffv1.mkv"
-		if [ "$step" = 1 ]; then
-			outfile="$OUTDIR/$outname"
-		elif [ "$step" = 3 ]; then
-			outfile="$STEP3DIR/$outname"
-		else
-			echo "ERROR: Input step does not make sense.  This is probably a bug."
-		fi
-		ffmpeg -n \
-			-hide_banner \
-			-v warning \
-			-stats \
-			-i "$file" \
-			-an -sn \
-			-vf "bwdif=mode=send_field:deint=all,mpdecimate=hi=200:lo=200:frac=1:max=0" \
-			-r 24000/1001 \
-			-c:v ffv1 "$outfile"
-	else
+	if [ "$step" = 1 ] || [ "$FIXRATE" = 0 ]; then
 		outname="${inname}-30fps-harddi-ffv1.mkv"
 		if [ "$step" = 1 ]; then
 			outfile="$OUTDIR/$outname"
@@ -431,6 +368,18 @@ function harddi {
 			-vf "bwdif=mode=send_field:deint=all,mpdecimate=hi=200:lo=200:frac=1:max=0" \
 			-r 30000/1001 \
 			-c:v ffv1 "$outfile"
+	else
+		outname="${inname}-24fps-harddi-ffv1.mkv"
+		outfile="$STEP3DIR/$outname"
+		ffmpeg -n \
+			-hide_banner \
+			-v warning \
+			-stats \
+			-i "$file" \
+			-an -sn \
+			-vf "bwdif=mode=send_field:deint=all,mpdecimate=hi=200:lo=200:frac=1:max=0" \
+			-r 24000/1001 \
+			-c:v ffv1 "$outfile"
 	fi
 	checkduration "$file" "$outfile"
 }
@@ -444,7 +393,9 @@ function mixed {
 		step=3
 		runsegments
 		step=4
-		segconcat
+		if [ "$FIXRATE" = 1 ]; then
+			segconcat
+		fi
 		outputsegs
 		segfail=0
 	elif [ "$step" -gt 1 ]; then
@@ -455,41 +406,22 @@ function mixed {
 }
 
 function softtelecine {
-	if [ "$FIXRATE" == "2" ]; then
-		outname="${inname}-120fps-sdtc-ffv1.mkv"
-		if [ "$step" = 1 ]; then
-			outfile="$OUTDIR/$outname"
-		elif [ "$step" = 3 ]; then
-			outfile="$STEP3DIR/$outname"
-		else
-			echo "ERROR: Input step does not make sense.  This is probably a bug."
-		fi
-		ffmpeg -n \
-			-hide_banner \
-			-v warning \
-			-stats \
-			-i "$file" \
-			-an -sn \
-			-r 120000/1001 \
-			-c:v ffv1 "$outfile"
+	outname="${inname}-24fps-sdtc-ffv1.mkv"
+	if [ "$step" = 1 ]; then
+		outfile="$OUTDIR/$outname"
+	elif [ "$step" = 3 ]; then
+		outfile="$STEP3DIR/$outname"
 	else
-		outname="${inname}-24fps-sdtc-ffv1.mkv"
-		if [ "$step" = 1 ]; then
-			outfile="$OUTDIR/$outname"
-		elif [ "$step" = 3 ]; then
-			outfile="$STEP3DIR/$outname"
-		else
-			echo "ERROR: Input step does not make sense.  This is probably a bug."
-		fi
-		ffmpeg -n \
-			-hide_banner \
-			-v warning \
-			-stats \
-			-i "$file" \
-			-an -sn \
-			-r 24000/1001 \
-			-c:v ffv1 "$outfile"
+		echo "ERROR: Input step does not make sense.  This is probably a bug."
 	fi
+	ffmpeg -n \
+		-hide_banner \
+		-v warning \
+		-stats \
+		-i "$file" \
+		-an -sn \
+		-r 24000/1001 \
+		-c:v ffv1 "$outfile"
 	checkduration "$file" "$outfile"
 	if [ "$tryalt" -eq "1" ]; then
 		outnamea="$outname"
@@ -646,64 +578,8 @@ function prepsegments {
 }
 
 function ntscinterlaced {
-	if [ "$FIXRATE" == "2" ]; then
-		outname="${inname}-120fps-deint-ffv1.mkv"
-		if [ "$step" = 1 ]; then
-			outfile="$OUTDIR/$outname"
-		elif [ "$step" = 3 ]; then
-			outfile="$STEP3DIR/$outname"
-		else
-			echo "ERROR: Input step does not make sense.  This is probably a bug."
-		fi
-		ffmpeg -n \
-			-hide_banner \
-			-v warning \
-			-stats \
-			-i "$file" \
-			-an -sn \
-			-vf "bwdif=mode=send_field" \
-			-r 120000/1001 \
-			-c:v ffv1 "$outfile"
-	elif [ "$FIXRATE" == "1" ]; then
-		# If the whole video is interlaced, keep it at 30FPS, otherwise, reduce to 24FPS.
-		if [ "$step" == 1 ]; then
-			outname="${inname}-30fps-deint-ffv1.mkv"
-			if [ "$step" = 1 ]; then
-				outfile="$OUTDIR/$outname"
-			elif [ "$step" = 3 ]; then
-				outfile="$STEP3DIR/$outname"
-			else
-				echo "ERROR: Input step does not make sense.  This is probably a bug."
-			fi
-			ffmpeg -n \
-				-hide_banner \
-				-v warning \
-				-stats \
-				-i "$file" \
-				-an -sn \
-				-vf "bwdif=mode=send_field" \
-				-r 30000/1001 \
-				-c:v ffv1 "$outfile"
-		else
-			outname="${inname}-24fps-deint-ffv1.mkv"
-			if [ "$step" = 1 ]; then
-				outfile="$OUTDIR/$outname"
-			elif [ "$step" = 3 ]; then
-				outfile="$STEP3DIR/$outname"
-			else
-				echo "ERROR: Input step does not make sense.  This is probably a bug."
-			fi
-			ffmpeg -n \
-				-hide_banner \
-				-v warning \
-				-stats \
-				-i "$file" \
-				-an -sn \
-				-vf "bwdif=mode=send_field" \
-				-r 24000/1001 \
-				-c:v ffv1 "$outfile"
-		fi
-	else
+	# If the whole video is interlaced, keep it at 30FPS, otherwise, reduce to 24FPS.
+	if [ "$step" == 1 ] || [ "$FIXRATE" = 0 ]; then
 		outname="${inname}-30fps-deint-ffv1.mkv"
 		if [ "$step" = 1 ]; then
 			outfile="$OUTDIR/$outname"
@@ -720,6 +596,24 @@ function ntscinterlaced {
 			-an -sn \
 			-vf "bwdif=mode=send_field" \
 			-r 30000/1001 \
+			-c:v ffv1 "$outfile"
+	else
+		outname="${inname}-24fps-deint-ffv1.mkv"
+		if [ "$step" = 1 ]; then
+			outfile="$OUTDIR/$outname"
+		elif [ "$step" = 3 ]; then
+			outfile="$STEP3DIR/$outname"
+		else
+			echo "ERROR: Input step does not make sense.  This is probably a bug."
+		fi
+		ffmpeg -n \
+			-hide_banner \
+			-v warning \
+			-stats \
+			-i "$file" \
+			-an -sn \
+			-vf "bwdif=mode=send_field" \
+			-r 24000/1001 \
 			-c:v ffv1 "$outfile"
 	fi
 	checkduration "$file" "$outfile"
@@ -794,21 +688,7 @@ function checkinterlace {
 	echo "Telecine match: $pcthtc" |tee -a "$logfile"
 }
 
-function process {
-	inname=$(echo "$file" |cut -d. -f1)
-	logtime="$(date +%s)"
-	tsfile="${inname}.smap"
-	echo "--------------------------------------------------"
-	echo "Working on file: $file" |tee -a "$PRELOG"
-	if [ $WRITELOGS = 1 ] && [ "$dryrun" != 1 ]; then
-		logfile="$LOGDIR/${inname}.${logtime}.log"
-		echo "Logging to: $logfile"
-		if [ -f "$PRELOG" ]; then
-			cat "$PRELOG" >"$logfile"
-		fi
-	else
-		logfile="/dev/null"
-	fi
+function getframerate {
 	indurs=$(ffprobe -v error -select_streams v -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$file")
 	echo "Duration: $indurs" |tee -a "$logfile"
 	inframes=$(ffprobe -v error -select_streams v -count_packets -show_entries stream=nb_read_packets -of csv=p=0 "$file" |head -n 1)
@@ -855,124 +735,126 @@ function process {
 			nomfrate="NA"
 		fi
 	fi
+}
+
+function process {
+	inname=$(echo "$file" |cut -d. -f1)
+	logtime="$(date +%s)"
+	tsfile="${inname}.smap"
+	echo "--------------------------------------------------"
+	echo "Working on file: $file" |tee -a "$PRELOG"
+	if [ $WRITELOGS = 1 ] && [ "$dryrun" != 1 ]; then
+		logfile="$LOGDIR/${inname}.${logtime}.log"
+		echo "Logging to: $logfile"
+		if [ -f "$PRELOG" ]; then
+			cat "$PRELOG" >"$logfile"
+		fi
+	else
+		logfile="/dev/null"
+	fi
+
+	getframerate
 	echo "Nominal Frame Rate: $nomfrate" |tee -a "$logfile"
 
 	if [ ! -f "$tsfile" ]; then
 		checkinterlace
 	fi
-	if [ "$nomfrate" == "25FPS" ]; then
-	# I have low confidence in PAL diagnosis.
-		if [ "$(echo "$pctintl < 80" |bc -l)" -eq 1 ]; then
-			echo "Diagnosis: PAL progressive video at 25FPS." |tee -a "$logfile"
-			sleep 5; echo
-			if [ ! "$dryrun" = 1 ]; then
-				palprogressive
-			else
-				echo "$file: PAL Progressive 25FPS" >>diagreport.txt
-			fi
-		else
-			echo "Diagnosis: PAL interlaced video at 25FPS." |tee -a "$logfile"
-			sleep 5; echo
-			if [ ! "$dryrun" = 1 ]; then
-				palinterlaced
-			else
-				echo "$file: PAL Interlaced 25FPS" >>diagreport.txt
-			fi
-		fi
-	elif [ "$nomfrate" == "24FPS" ]; then
-		echo "Diagnosis: Soft telecined video at 24 FPS." |tee -a "$logfile"
-		sleep 5; echo
-		if [ ! "$dryrun" = 1 ]; then
-			softtelecine
-		else
-			echo "$file: Soft Telecine 24FPS" >>diagreport.txt
-		fi
-	elif [ "$nomfrate" == "30FPS" ]; then
-		if [ "$(echo "$pcthtc >= $HTCTHRESH" |bc -l)" -eq 1 ] && [ "$(echo "$pctintl > 80" |bc -l)" -eq 1 ] && [ "$step" == "9" ]; then
-			echo "Diagnosis: Mixed hard telecine and interlacing." |tee -a "$logfile"
-			sleep 5; echo
-			if [ ! "$dryrun" = 1 ]; then
-				hardmix
-			else
-				echo "$file: Mixed HTC and Interlacing" >>diagreport.txt
-			fi
-		elif [ "$(echo "$pcthtc >= $HTCTHRESH" |bc -l)" -eq 1 ]; then
-			echo "Diagnosis: Hard telecined video at 24 FPS." |tee -a "$logfile"
-			sleep 5; echo
-			if [ ! "$dryrun" = 1 ]; then
-				hardtelecine
-			else
-				echo "$file: Hard Telecine 24FPS" >>diagreport.txt
-			fi
-		elif [ "$(echo "$pctintl > $INTLTHRESH" |bc -l)" -eq 1 ]; then
-			echo "Diagnosis: True, interlaced NTSC video at 30FPS." |tee -a "$logfile"
-			sleep 5; echo
-			if [ ! "$dryrun" == 1 ]; then
-				ntscinterlaced
-			else
-				echo "$file: True Interlaced 30FPS" >>diagreport.txt
-			fi
-		elif [ "$(echo "$pcthtc < 1" |bc -l)" -eq 1 ] && [ "$(echo "$pctintl < 1" |bc -l)" -eq 1 ]; then
-			echo "Diagnosis: Soft telecine with misleading frame rate." |tee -a "$logfile"
-			sleep 5; echo
-			if [ ! "$dryrun" == 1 ]; then
-				softtelecine
-			else
-				echo "$file: Soft telecine bad FPS" >>diagreport.txt
-			fi
-		elif [ "$(echo "$pcthtc < 1" |bc -l)" -eq 1 ] && [ "$(echo "$pctintl > 20" |bc -l)" -eq 1 ]; then
-			echo "Diagnosis: Soft telecined/interlaced border or transition." |tee -a "$logfile"
-			sleep 5; echo
-			if [ ! "$dryrun" == 1 ]; then
-				ntscinterlaced
-			else
-				echo "$file: Partially interlaced video" >>diagreport.txt
-			fi
-		else
-			echo "Diagnosis: Mixed hard telecined and interlaced video." |tee -a "$logfile"
-			sleep 5; echo
-			if [ "$step" == "1" ]; then
+
+	if [ "$FIXRATE" = 2 ]; then
+		hardmix
+	else
+		if [ "$nomfrate" == "25FPS" ]; then
+		# I have low confidence in PAL diagnosis.
+			if [ "$(echo "$pctintl < 80" |bc -l)" -eq 1 ]; then
+				echo "Diagnosis: PAL progressive video at 25FPS." |tee -a "$logfile"
+				sleep 5; echo
 				if [ ! "$dryrun" = 1 ]; then
-					if [ ! -f "$tsfile" ] && [ "$AUTOMAP" == 1 ]; then
-						"$MAPPER" "$file"
-					fi
-					mixed
+					palprogressive
 				else
-					echo "$file: Mixed HTC+INTL" >>diagreport.txt
-					echo "$file" >>maplist.txt
-					if [ "$AUTOMAP" == 1 ]; then
-						"$MAPPER" "$file"
-					fi
+					echo "$file: PAL Progressive 25FPS" >>diagreport.txt
 				fi
 			else
-				ntscinterlaced
+				echo "Diagnosis: PAL interlaced video at 25FPS." |tee -a "$logfile"
+				sleep 5; echo
+				if [ ! "$dryrun" = 1 ]; then
+					palinterlaced
+				else
+					echo "$file: PAL Interlaced 25FPS" >>diagreport.txt
+				fi
 			fi
-		fi
-	elif [ "$nomfrate" == "Mix" ]; then
-		echo "Diagnosis: Mixed progressive, telecined, and/or interlaced video." |tee -a "$logfile"
-		sleep 5; echo
-		if [ ! "$dryrun" = 1 ]; then
-			if [ ! -f "$tsfile" ] && [ "$AUTOMAP" == 1 ]; then
-				"$MAPPER" "$file"
+		elif [ "$nomfrate" == "24FPS" ]; then
+			echo "Diagnosis: Soft telecined video at 24 FPS." |tee -a "$logfile"
+			sleep 5; echo
+			if [ ! "$dryrun" = 1 ]; then
+				softtelecine
+			else
+				echo "$file: Soft Telecine 24FPS" >>diagreport.txt
 			fi
-			mixed
+		elif [ "$nomfrate" == "30FPS" ]; then
+			if [ "$(echo "$pcthtc >= $HTCTHRESH" |bc -l)" -eq 1 ]; then
+				echo "Diagnosis: Hard telecined video at 24 FPS." |tee -a "$logfile"
+				sleep 5; echo
+				if [ ! "$dryrun" = 1 ]; then
+					hardtelecine
+				else
+					echo "$file: Hard Telecine 24FPS" >>diagreport.txt
+				fi
+			elif [ "$(echo "$pctintl > $INTLTHRESH" |bc -l)" -eq 1 ]; then
+				echo "Diagnosis: True, interlaced NTSC video at 30FPS." |tee -a "$logfile"
+				sleep 5; echo
+				if [ ! "$dryrun" == 1 ]; then
+					ntscinterlaced
+				else
+					echo "$file: True Interlaced 30FPS" >>diagreport.txt
+				fi
+			elif [ "$(echo "$pcthtc < 1" |bc -l)" -eq 1 ] && [ "$(echo "$pctintl < 1" |bc -l)" -eq 1 ]; then
+				echo "Diagnosis: Soft telecine with misleading frame rate." |tee -a "$logfile"
+				sleep 5; echo
+				if [ ! "$dryrun" == 1 ]; then
+					softtelecine
+				else
+					echo "$file: Soft telecine bad FPS" >>diagreport.txt
+				fi
+			elif [ "$(echo "$pcthtc < 1" |bc -l)" -eq 1 ] && [ "$(echo "$pctintl > 20" |bc -l)" -eq 1 ]; then
+				echo "Diagnosis: Soft telecined/interlaced border or transition." |tee -a "$logfile"
+				sleep 5; echo
+				if [ ! "$dryrun" == 1 ]; then
+					ntscinterlaced
+				else
+					echo "$file: Partially interlaced video" >>diagreport.txt
+				fi
+			else
+				echo "Diagnosis: Inseparable hard telecined and interlaced video." |tee -a "$logfile"
+				hardmix
+			fi
+		elif [ "$nomfrate" == "Mix" ]; then
+			echo "Diagnosis: Mixed progressive, telecined, and/or interlaced video." |tee -a "$logfile"
+			sleep 5; echo
+			if [ ! "$dryrun" = 1 ]; then
+				if [ ! -f "$tsfile" ] && [ "$AUTOMAP" == 1 ]; then
+					"$MAPPER" "$file"
+				fi
+				mixed
+			else
+				echo "$file: Mixed Methods" >>diagreport.txt
+				echo "$file" >>maplist.txt
+				if [ "$AUTOMAP" == 1 ]; then
+					"$MAPPER" "$file"
+				fi
+			fi
 		else
-			echo "$file: Mixed Methods" >>diagreport.txt
-			echo "$file" >>maplist.txt
-			if [ "$AUTOMAP" == 1 ]; then
-				"$MAPPER" "$file"
+			if [ "$dryrun" = 1 ]; then
+				echo "$file: Invalid video type" >>diagreport.txt
 			fi
+			echo "ERROR: This doesn't appear to be NTSC or PAL SD video." |tee -a "$logfile";echo
 		fi
-	else
-		if [ "$dryrun" = 1 ]; then
-			echo "$file: Invalid video type" >>diagreport.txt
-		fi
-		echo "ERROR: This doesn't appear to be NTSC or PAL SD video." |tee -a "$logfile";echo
 	fi
 }
 
 IFS=$'\n'
+umask 0000
 dryrun=0
+usealts=0
 rundir="$(pwd)"
 
 if [ "$OUTDIR" == "CHANGEME" ]; then
@@ -980,7 +862,7 @@ if [ "$OUTDIR" == "CHANGEME" ]; then
 	exit 1
 fi
 
-while getopts ":i:o:s:m:d:f:" flag; do
+while getopts ":i:o:s:m:f:d" flag; do
 	case "${flag}" in
 		i) file="${OPTARG}";;
 		o) OUTDIR="${OPTARG}";;

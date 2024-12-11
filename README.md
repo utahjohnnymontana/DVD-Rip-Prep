@@ -207,7 +207,9 @@ What to do when a file contains more than one true frame rate.  That is, after a
 
 FIXRATE can also be overridden with the command line switch -f.  So, "-f 2", for example, will trigger FIXRATE 2 without editing the settings.
 
-The default of 1 works well for most of my library, in which 30FPS sections tend to be short, but it does drop frames to get the lower frame rate, so it is destructive.  In videos that have substantial 30 FPS segments, 2 would be  a better approach.  2 is always the lossless approach, but 120 FPS videos might not play on everything.  FIXRATE 2 is also still new/experimental and does not always work well for reasons that I don't understand.  FIXRATE 0 will just output the segment files at their native frame rates and you can decide what to do with them.
+The default of 1 works well for most of my library, in which 30FPS sections tend to be short, but it does drop frames to get the lower frame rate, so it is destructive.  In videos that have substantial 30 FPS segments, 2 would be  a better approach.  2 is always the less destructive approach, but 120 FPS videos might not play on everything.  FIXRATE 2 is also still new/experimental and does not always work well for reasons that I don't understand.  FIXRATE 0 will just output the segment files at their native frame rates and you can decide what to do with them.
+
+FIXRATE 2 has the advantage that it cuts out any analysis of mixed video, so the analysis is much faster although the upscaling will be slower.  It is usually the best  solution for a lot of shows that were edited on video and contain CGI sequences.
 
 More advice for FIXRATE 2: You only need it for mixed videos.  Single method videos will be output at their true frame rates already.  You don't always need it for mixed rate videos.  A lot of mixed videos only mix soft and hard telecine and will be output most appropriately at 24 FPS.  FIXRATE 2 becomes useful when there is true interlaced content mixed with telecined content.  Whenever this combination occurs, it is not a bad idea to at least try FIXRATE 2 for comparison.  Whenever this combination occurs and you see stutters in the output, then this should fix it.  The downsides to FIXRATE 2 are that the higher frame rate produces a slightly larger file (although not linearly, since the extra frames are duplicates) and that it takes longer to upscale.
 
@@ -277,7 +279,7 @@ If enabled (1), which is now the default, the script will create an 8GB tmpfs me
 
 If the script crashes or you break out of it, you will need to manually unmount the filesystem, which you can do with the following command:
 
-sudo umount ~/00DRP.*/segments
+sudo umount ~/00DRP/*/segments
 
 (This command assumes that you have not changed OUTDIR.)
 
@@ -305,17 +307,25 @@ PAL format, non-interlaced.  These ran just fine with the default settings and P
 
 Season 1 is mostly hard telecined with a few mixed episodes.  All ran successfully with default settings: SEGSIZE 0.1, MINSEG 3.
 
+### Gunsmoke (1955)
+
+Season 1 is mostly soft telecined and ran successfully with default settings.
+
 ### The Loner (1965)
 
 Hard telecined all the way through.  Ran successfully with default settings.
 
 ### The Simpsons (1989)
 
-Some episodes are mixed.  Others are diagnosed as hard telecined, but they show evidence of having some full interlacing mixed in.  Luckily, that is handled by the hard telecine method, which marks interlaced frames and then deinterlaces them following inverse telecine.  So, everything works fine with the default settings.
+Episodes are mixed.  While many can be processed at FIXRATE 1, most are at least a little better at FIXRATE 2, so that it what I recommend.
+
+### Star Trek Deep Space Nine (1993)
+
+Episodes are mixed.  Some can be processed at FIXRATE 1, but most require FIXRATE 2, so it is probably best to use that for all of them.
 
 ### The Twilight Zone (1985)
 
-These episodes are mostly hard telecined, but a few are mixed to a crazy degree, with hundreds of frame rate transitions.  Episode 1&2 has 323 segments and took more than a day to process!  I can't imagine what the editing process was like.  The mixed episodes need a MINSEG of 1.
+These episodes are mostly hard telecined, but a few are mixed to a crazy degree, with hundreds of frame rate transitions.  Episode 1&2 has 323 segments and took more than a day to process!  The best and certainly easiest approch here is to just run them at FIXRATE 2 if you can accept 120FPS.
 
 ### The Virginian (1962)
 
