@@ -24,7 +24,7 @@ You will find these techniques used in different places.  Almost all North Ameri
 
 When telecine is removed from filmed content, the frame rate is restored to 24 FPS.  When fully interlaced content is deinterlaced, then the frame rate is either 30 or 60 FPS.  This is no problem when only one of these techniques is used, but when they are combined, there is no way to get to uniformly progressive frames without either increasing the frame rate of the 24 FPS material or dropping frames from the 30/60 FPS material.  After all, by removing telecine, we have removed the original solution to this rate mismatch.  There is no single solution to this problem.  In many cases, videos consist of something like 95% telecined content and 5% interlaced.  In such cases, the interlacing tends to be in the titles and credits and you might never notice if you dropped 20% of the frames from those sections.
 
-In other cases, the 30 FPS sections might be special effects and dropping frames would be really noticeable.  In that case, the only solution is to increase the overall frame rate of the video to something that can accommodate both rates.  The closest frame rate that is wholly divisible by 24, 30, and 60 is 120.  So, a video that mixes 24 FPS filmed content and 30 FPS video content can be increased to 120 FPS by quintupling the 24 FPS frames and quadrupling the 30 FPS frames.  This maintains the original cadence of all content.  The script can now perform this 120FPS conversion (set FIXRATE to 2) but, for reasons that I don't yet understand, it does not always produce a result with the same audio sync as the lower frame rate version, so this is an experimental feature.
+In other cases, the 30 FPS sections might be special effects and dropping frames would be really noticeable.  In that case, the only solution is to increase the overall frame rate of the video to something that can accommodate both rates.  The closest frame rate that is wholly divisible by 24, 30, and 60 is 120.  So, a video that mixes 24 FPS filmed content and 30 FPS video content can be increased to 120 FPS by quintupling the 24 FPS frames and quadrupling the 30 FPS frames.  This maintains the original cadence of all content.  The script can now perform this 120FPS conversion (set FIXRATE to 2) and this will solve almost any DVD rip, as long as you are willing to accept the downsides of conversion to 120FPS, which are increased file size, increased upscaling time, and incompatibility with screens that don't have 120Hz refresh rates.
 
 Writing this script has been quite an education and, if I had known what I know now in the beginning, I might have dropped the idea.  The ways that these techniques are used on TV shows, even within a given season of a given show, is surprisingly inconsistent and, in some cases, looks outright crazy.  There are, of course, a lot of shows that use just one technique or use a mix but at least in a predictable pattern.  But there are also a surprisingly large number of shows that go from one technique to another from episode to episode and that mix them in ways that seem quite strange.  Some use mixes in a way that almost seems intentionally designed to defeat any future efforts to disentagle them.  I have been able to figure out solutions for a lot of shows, but there are some that I will probably never crack and can only approach with a "least bad" method.
 
@@ -245,7 +245,11 @@ If enabled, the script will output the processed segments when the mixed process
 
 #### RATELOCK
 
-RATELOCK determines how far the frame rate can diverge from the nominal rate and still be treated by the script as having that nominal frame rate.  The default is 0.005, which translates, for example, into a film rate range of 23.88 to 24.12.  This allows the script to ignore a maximum of about 15 seconds of material that is not at the predominant frame rate.  The original RATELOCK setting was 0.01 and that is still a reasonable setting if you are not too particular about dropping frames from 30FPS sections that probably only occur in titles or credits.  0.002 is about the lowest/most strict that you might want to try, but the result will be running a lot of things through the much slower mixed process when they don't really need it.  You could reasonably go as high as 0.05 if your goal is to ignore 30FPS titles and credits that amount to a couple minutes of runtime.
+RATELOCK determines how far the frame rate can diverge from the nominal rate and still be treated by the script as having that nominal frame rate.  The default is 0.005, which translates, for example, into a film rate range of ~23.86 to 24.1.  This allows the script to ignore a maximum of about 9.5 seconds per hour of material that is not at the predominant frame rate.  The original RATELOCK setting was 0.01 and that is still a reasonable setting if you are not too particular about dropping frames from 30FPS sections that probably only occur in titles or credits.  0.002 is about the lowest/most strict that you might want to try, but the result will be running a lot of things through the much slower mixed process when they don't really need it.  You could reasonably go as high as 0.05 if your goal is to ignore 30FPS titles and credits that amount to a couple minutes of runtime.
+
+#### STRICT
+
+STRICT overrides RATELOCK settings with a value of 0.0005, which will cause the script to use the mixed method even when there is a very small amount of material at a different frame rate.  For example, it is not unusual for a soft telecined program to have a bumper that is hard telecined.  We can save a lot of time by just treating the whole video like it is soft telecined because these few seconds of video at the beginning or end of the program are unlikely to suffer if some frames are dropped, because there is probably little to no motion.  Once in a while, you might find that the script breaks something that you want to preserve, in which case you can use strict mode.  STRICT mode allows less than 1 second per hour of material at a different frame rate and this amount is more likely to just be variance in the frame rate measurement than the actual presence of a segment with a different rate.  Default is disabled (0).  STRICT can be set with the command line switch -x.
 
 #### WRITELOGS
 
@@ -285,7 +289,7 @@ sudo umount ~/00DRP/*/segments
 
 ## Tested Titles
 
-Notes on what I have tested with the script, with suggested settings.
+I wrote the script based on what I discovered when analyzing my collection of TV shows on DVD.  I analyzed a few hundred movies as well, but movies tend to be very predictable and are almost never mixed.  I figured that I might as well report what I found with each of these series, since it might help others and might also give you clues about where to start with shows that are similar.
 
 ### Alfred Hitchcock Presents (1955)
 
@@ -293,7 +297,7 @@ This is a pretty easy one.  Most episodes are mixed, but it is mostly just that 
 
 ### The Adventures of Brisco County Jr. (1993)
 
-The first episode is hard telecined, but the rest are all mixed.  Episodes vary in complexity, with some of the more special effects heavy episodes having more than thirty segments.  It ran successfully with default settings: SEGSIZE 0.1, MINSEG 3.
+The first episode is hard telecined, but the rest are all mixed.  Episodes vary in complexity, with some of the more special effects heavy episodes having more than thirty segments.  It ran successfully with default settings: SEGSIZE 0.1, MINSEG 3, with the exception of episode 11 which required a MINSEG of 1.
 
 ### Alien Nation (1989)
 
@@ -303,13 +307,70 @@ This one is mostly mixed episodes, with a few hard telecined.  Because most of t
 
 PAL format, non-interlaced.  These ran just fine with the default settings and PAL conversion.
 
+### Black Mirror (2011)
+
+PAL DVD sets.  These are all progressive, 25FPS.  HTC% ranges from 0 to 0.15, INTL% ranges from 0.18 to 2.03.  They process successfully with default settings.
+
 ### Bonanza (1959)
 
-Season 1 is mostly hard telecined with a few mixed episodes.  All ran successfully with default settings: SEGSIZE 0.1, MINSEG 3.
+Seasons 1-8 are hard telecined, except for episodes that contain the original promotional segments and bumpers, which are mixed, but don't really suffer from just being run as hard telecine.  HTC% ranges from 8.01 to 20.36, INTL% ranges from 81.49 to 87.88.  All ran successfully with SEGSIZE 0.1, MINSEG 3.
+
+### Carnivale (2003)
+
+Seasons 1 and 2 are soft telecined and run successfully with default settings.  HTC% ranges from 0 to 0.09 and INTL% ranges from 0 to 1.01.
+
+### Cimarron Strip (1967)
+
+All episodes are hard telecined and process successfully with default settings.  HTC% ranges from 3.43 to 11.47 and INTL% ranges from 81.98 to 85.65.
+
+### Colonel March of Scotland Yard (1954)
+
+Episodes 1-17 are soft telecined.  Unfortunately, 18-26 are improperly deinterlaced hard telecine with the associated motion defects.  The soft telecined episodes run just fine and the badly deinterlaced episodes are properly detected and improved with the baddtc method (which uses mpdecimate to eliminate duplicates), but don't come out quite as nicely as the soft telecined episodes, since you generally don't get perfection with duplicate detection.  HTC% ranges from 0 to 0.01 and INTL% ranges from 0.02 to 1.95.
+
+### Colony (2016)
+
+Season 1 is soft telecined, with HTC% ranging from 0 to 0.1 and an INTL% ranging from 0.01 to 0.07.  Season 2 is hard telecined, with 
+HTC% ranging from 28.03 to 32.58 and INTL% from 87.33 to 88.8.  They all run successfully with default settings.
+
+### Continuum (2012)
+
+All four seasons are soft telecined, with HTC% ranging from 0 to 0.03 and INTL% from 0 to 0.76.  They all run successfully with default settings.
+
+### Counterpart (2017)
+
+Season 2 is soft telecined, with HTC% ranging from 0 to 0.1 and INTL% from 0.21 to 0.35.  They run successfully with default settings.
+
+### Custer (1967)
+
+All but episode 12 is hard telecined, with HTC% ranging from 8.95 to 20.30 and INTL% from 83.36 to 88.33.  Episode 12 is fully interlaced (0.52/98.44).  They all run successfully with default settings.
+
+### Darknet (2017)
+
+PAL DVD set.  Progressive, 25FPS.  HTC% 0 to 0.11, INTL% 0.06 to 0.27.  Ran successfully with default settings.
+
+### Dead of Night (1972)
+
+PAL DVD set.  Interlaced, 25FPS.  HTC% 0.15 to 0.22, INTL% 65.76 to 94.39.  Ran successfully with default settings.
+
+### Dead Man's Gun (1997)
+
+All hard telecined with HTC% ranging from 7.21 to 22.26 and INTL% 82.35 to 87.95.  Ran successfully with default settings.
+
+### Earth Final Conflict (1997)
+
+Season 1 is fully interlaced with the exception of episode 18, which is hard telecined (11.41/82.15).  HTC% ranges from 0.87 to 1.23 and INTL% ranges from 91.20 to 94.7.  Ran successfully with default settings.
+
+### Fear Itself (2008)
+
+All hard telecined with HTC% ranging from 14.02 to 25.63 and INTL% from 83.16 to 88.16.  Ran successfully with default settings.
 
 ### Gunsmoke (1955)
 
-Season 1 is mostly soft telecined and ran successfully with default settings.
+All seasons either soft or hard telecined.  Soft telecined seasons: 1, 2 (except ep 7), 13 (except ep 21) 15, 16, 17, 18, 19, 20.  Hard telecined seasons: 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14 (except ep 12).  HTC% ranges from 7.38 to 26.14 and INTL% from 82.13 to 89.75 for hard telecined episodes.  HTC% ranges from 0 to 0.13 and INTL% from 0 to 0.69 for soft telecined episodes.  All ran successfully with default settings.  Some season 2 episodes have an interlaced CBS bumper at the end that slightly increases the calculated frame rate, but within the default settings for 24FPS.
+
+### Have Gun Will Travel (1957)
+
+Seasons 1-3 combine soft and hard telecined, mixed, and even a couple fully interlaced episodes.  Seasons 4-6 are hard telecined.
 
 ### The Loner (1965)
 
@@ -325,7 +386,7 @@ Episodes are mixed.  Some can be processed at FIXRATE 1, but most require FIXRAT
 
 ### The Twilight Zone (1985)
 
-These episodes are mostly hard telecined, but a few are mixed to a crazy degree, with hundreds of frame rate transitions.  Episode 1&2 has 323 segments and took more than a day to process!  The best and certainly easiest approch here is to just run them at FIXRATE 2 if you can accept 120FPS.
+These episodes are mostly hard telecined with interlaced credits, but a few are mixed to a crazy degree, with hundreds of frame rate transitions.  Episode 1&2 has 323 segments and took more than a day to process!  The best and certainly easiest approch here is to just run them at FIXRATE 2 if you can accept 120FPS.
 
 ### The Virginian (1962)
 
