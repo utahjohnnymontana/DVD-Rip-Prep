@@ -1,5 +1,5 @@
 #!/bin/bash
-# smap (Segment Mapper) bash script - Dec. 9 2024
+# smap (Segment Mapper) bash script - Dec. 19 2024
 #
 # This script attempts to analyze an MKV file produced by MakeMKV from a DVD 
 # source and find where the original frame rates change in the video.  It
@@ -9,7 +9,9 @@
 USERAMDISK=1
 KEEPRAMDISK=0
 SEGSIZE="0.1"
-MINSEG="3"
+MINSEG="1"
+DEBUG=0
+DEBUGSLOW=0
 
 # Set directories if not exported from drp (i.e. if not running smap directly)
 if [ ! "$OUTDIR" ]; then
@@ -23,9 +25,11 @@ if [ ! "$TEMPDIR" ]; then
 fi
 LOGDIR="$TEMPDIR/LOGS"
 SEGDIR="$TEMPDIR/segments"
+PIDFILE="$TEMPDIR/PID$$"
 # End of settings
 
 function setup {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function setup."
 	echo "Setting up directories and cleaning up from previous run..."
 	if [ ! -d "$TEMPROOT" ]; then
 		mkdir "$TEMPROOT" || exit 1
@@ -44,6 +48,7 @@ function setup {
 			rm -f *
 		fi
 	fi
+	touch "$PIDFILE"
 	cd "$rundir" || exit 1
 	if [ "$USERAMDISK" == 1 ]; then
 		mntstatus=$(grep "SEGDIR" /proc/mounts |cut -d' ' -f 3)
@@ -55,9 +60,37 @@ function setup {
 		fi
 	fi
 	sleep 10
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function setup."
+}
+
+function cleanup {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function cleanup."
+	if [ "$USERAMDISK" == 1 ] && [ "$KEEPRAMDISK" == 0 ]; then
+		cd "$rundir"
+		echo "Unmounting memory filesystem.  You may be prompted to authenticate if not root."
+		sudo umount "$SEGDIR"
+	fi
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function cleanup."
+}
+
+function debugtoggle {
+	if [ "$DEBUG" = 1 ]; then
+		DEBUG=0
+	else
+		DEBUG=1
+	fi
+}
+
+function debugslowtoggle {
+	if [ "$DEBUGSLOW" = 1 ]; then
+		DEBUGSLOW=0
+	else
+		DEBUGSLOW=1
+	fi
 }
 
 function reportsettings {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function reportsettings."
 	echo "Reporting settings..."
 	if [ "$USERAMDISK" = 1 ]; then
 		echo "Memory filesystem is enabled."
@@ -74,20 +107,30 @@ function reportsettings {
 	echo "OUTDIR is $OUTDIR"
 	echo "TEMPDIR is $TEMPDIR"
 	echo "LOGDIR is $LOGDIR"
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function reportsettings."
 }
 
 function makesegs {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function makesegs."
 	echo "Dividing the input file into minimum time segments..."
+	[ $DEBUG = 0 ] || set -x
+	set -m
+	cd "$rundir"
 	ffmpeg -an -sn \
 		-i "$infile" \
 		-f segment \
 		-segment_time "$SEGSIZE" \
 		-reset_timestamps 1 \
 		-c:v copy "$SEGDIR/%05d.mkv"
+	set +m
+	[ $DEBUG = 0 ] || set +x
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function makesegs."
 }
 
 function getstandard {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function getstandard."
 	invres=$(ffprobe -v error -select_streams v -show_entries stream=height -of default=noprint_wrappers=1:nokey=1 00000.mkv)
+	[ $DEBUG = 0 ] || echo "DEBUG: Variable invres is $invres."
 	if [ "$invres" -eq "576" ]; then
 		standard="PAL"
 		echo "Trying PAL frame rate analysis.  This is not reliable."
@@ -98,161 +141,240 @@ function getstandard {
 		standard="UNKNOWN"
 		echo "ERROR: This doesn't appear to be NTSC or PAL SD video."
 	fi
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function getstandard."
 }
 
 function getfratesntsc {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function getfratesntsc."
 	echo "Getting the frame rate of each segment file..."
 	for file in $(ls -1 *.mkv); do
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable file is $file."
 		curfile="$file"
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable curfile is $curfile."
 		filenum=$(echo "$curfile" |cut -d. -f1)
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable filenum is $filenum."
 		nextnum=$(printf "%05d" $((10#$filenum + 1)))
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable nextnum is $nextnum."
 		prevnum=$(printf "%05d" $((10#$filenum - 1)))
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable prevnum is $prevnum."
 		if [ "$prevnum" -lt 0 ]; then
 			prevnum="00000"
 		fi
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable prevnum is $prevnum."
 		if [ "$nextnum" -gt "$filecount" ]; then
 			nextnum="$(printf "%05d" "$filecount")"
 		fi
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable nextnum is $nextnum."
 		nextfile="$nextnum.mkv"
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable nextfile is $nextfile."
 		prevfile="$prevnum.mkv"
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable prevfile is $prevfile."
 	
 		curdurs=$(ffprobe -v error -select_streams v -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$curfile")
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable curdurs is $curdurs."
 		curframes=$(ffprobe -v error -select_streams v -count_packets -show_entries stream=nb_read_packets -of csv=p=0 "$curfile" |head -n 1)
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable curframes is $curframes."
 		curfrate=$(echo "$curframes / $curdurs" |bc -l)
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable curfrate is $curfrate."
 		nextdurs=$(ffprobe -v error -select_streams v -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$nextfile")
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable nextdurs is $nextdurs."
 		nextframes=$(ffprobe -v error -select_streams v -count_packets -show_entries stream=nb_read_packets -of csv=p=0 "$nextfile" |head -n 1)
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable nextframes is $nextframes."
 		nextfrate=$(echo "$nextframes / $nextdurs" |bc -l)
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable nextfrate is $nextfrate."
 		prevdurs=$(ffprobe -v error -select_streams v -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$prevfile")
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable prevdurs is $prevdurs."
 		prevframes=$(ffprobe -v error -select_streams v -count_packets -show_entries stream=nb_read_packets -of csv=p=0 "$prevfile" |head -n 1)
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable prevframes is $prevframes."
 		prevfrate=$(echo "$prevframes / $prevdurs" |bc -l)
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable prevfrate is $prevfrate."
 
 		if [ "$prevfrate" == "" ]; then
 			prevfrate="$curfrate"
+			[ $DEBUG = 0 ] || echo "DEBUG: Variable prevfrate is $prevfrate."
 		fi
 
 		cumtime=$(echo "$cumtime + $curdurs" |bc -l)
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable cumtime is $cumtime."
 
 		if [ "$(echo "$curfrate < 25" |bc -l)" -eq 1 ]; then
-			nomfrate="24FPS"
+			nomfrate="24"
 		elif [ "$(echo "$curfrate > 29" |bc -l)" -eq 1 ]; then
-			nomfrate="30FPS"
+			nomfrate="30"
 		elif [ "$filenum" -lt "1" ] && [ "$(echo "$curfrate < 26.5" |bc -l)" -eq 1 ]; then
-			nomfrate="24FPS"
+			nomfrate="24"
 		elif [ "$filenum" -lt "1" ] && [ "$(echo "$curfrate >= 26.5" |bc -l)" -eq 1 ]; then
-			nomfrate="30FPS"
-		elif [ "$(echo "$curfrate > 35" |bc -l)" -eq 1 ] || [ "$(echo "$curfrate < 20" |bc -l)" -eq 1 ]; then
-			echo "ERROR: Frame rate out of range for DVD sourced video."
-			exit 1
+			nomfrate="30"
+		elif [ "$(echo "$curfrate > 35" |bc -l)" -eq 1 ]; then
+			echo "WARNING: Frame rate way out of range for DVD sourced video."
+			nomfrate="30"
+		elif [ "$(echo "$curfrate < 20" |bc -l)" -eq 1 ]; then
+			echo "WARNING: Frame rate way out of range for DVD sourced video."
+			nomfrate="24"
 		else
 			# Frame rate is not diagnostic, so compare it to previous and next
-			# High point among marginal 24FPS
 			echo "Ambiguous frame rate at $curfile.  Trying before/after comparison."
-			if [ "$(echo "$curfrate <= 27" |bc -l)" -eq 1 ] && [ "$(echo "$prevfrate <= 26" |bc -l)" -eq 1 ] && [ "$(echo "$nextfrate <= 26" |bc -l)" -eq 1 ]; then
-				nomfrate="24FPS"
-			# Low point among marginal 30FPS
-			elif [ "$(echo "$curfrate >= 27" |bc -l)" -eq 1 ] && [ "$(echo "$prevfrate >= 28" |bc -l)" -eq 1 ] && [ "$(echo "$nextfrate >= 28" |bc -l)" -eq 1 ]; then
-				nomfrate="30FPS"
-			# Mid point between 24 and 30 FPS
-			elif [ "$(echo "$curfrate <= 27" |bc -l)" -eq 1 ] && [ "$(echo "$prevfrate < 27" |bc -l)" -eq 1 ] && [ "$(echo "$nextfrate > 27" |bc -l)" -eq 1 ]; then
-				nomfrate="30FPS"
-			# Mid point between 30 and 24 FPS
-			elif [ "$(echo "$curfrate >= 27" |bc -l)" -eq 1 ] && [ "$(echo "$prevfrate > 27" |bc -l)" -eq 1 ] && [ "$(echo "$nextfrate < 27" |bc -l)" -eq 1 ]; then
-				nomfrate="24FPS"
+			# Climbing to 30
+			if [ "$(echo "$prevfrate <= 27" |bc -l)" -eq 1 ] && [ "$(echo "$curfrate <= 27" |bc -l)" -eq 1 ] && [ "$(echo "$nextfrate > 27" |bc -l)" -eq 1 ]; then
+				nomfrate="24"
+			# Falling from 30
+			elif [ "$(echo "$prevfrate > 27" |bc -l)" -eq 1 ] && [ "$(echo "$curfrate <= 27" |bc -l)" -eq 1 ] && [ "$(echo "$nextfrate <= 27" |bc -l)" -eq 1 ]; then
+				nomfrate="24"
+			# Low point between marginal 30s
+			elif [ "$(echo "$prevfrate > 27" |bc -l)" -eq 1 ] && [ "$(echo "$curfrate <= 27" |bc -l)" -eq 1 ] && [ "$(echo "$nextfrate > 27" |bc -l)" -eq 1 ]; then
+				nomfrate="30"
+			# Marginal low stretch
+			elif [ "$(echo "$prevfrate <= 27" |bc -l)" -eq 1 ] && [ "$(echo "$curfrate <= 27" |bc -l)" -eq 1 ] && [ "$(echo "$nextfrate <= 27" |bc -l)" -eq 1 ]; then
+				nomfrate="24"
+			# Climbing to 30
+			elif [ "$(echo "$prevfrate <= 27" |bc -l)" -eq 1 ] && [ "$(echo "$curfrate > 27" |bc -l)" -eq 1 ] && [ "$(echo "$nextfrate > 27" |bc -l)" -eq 1 ]; then
+				nomfrate="30"
+			# Falling from 30
+			elif [ "$(echo "$prevfrate > 27" |bc -l)" -eq 1 ] && [ "$(echo "$curfrate > 27" |bc -l)" -eq 1 ] && [ "$(echo "$nextfrate <= 27" |bc -l)" -eq 1 ]; then
+				nomfrate="30"
+			# Marginal high stretch
+			elif [ "$(echo "$prevfrate > 27" |bc -l)" -eq 1 ] && [ "$(echo "$curfrate > 27" |bc -l)" -eq 1 ] && [ "$(echo "$nextfrate > 27" |bc -l)" -eq 1 ]; then
+				nomfrate="30"
+			# High point between marginal 30s
+			elif [ "$(echo "$prevfrate <= 27" |bc -l)" -eq 1 ] && [ "$(echo "$curfrate > 27" |bc -l)" -eq 1 ] && [ "$(echo "$nextfrate <= 27" |bc -l)" -eq 1 ]; then
+				nomfrate="24"
+			else
+				echo "ERROR: Something unexpected happened during ambiguous frame rate comparison."
+				exit 1
 			fi
 		fi
 
 	    echo "${line}:${curfile},${curdurs},${cumtime},${curframes},${curfrate},${nomfrate}" |tee -a "$reportfile"
 		line=$((line + 1))
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable line is $line."
+		[ $DEBUGSLOW = 0 ] || sleep 10
 	done
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function getfratesntsc."
 }
 
 function getfratespal {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function getfratespal."
 	echo "Getting the frame rate of each segment file..."
 	for file in $(ls -1 *.mkv); do
-		echo "Working on $file"
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable file is $file."
 		curfile="$file"
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable curfile is $curfile."
 		filenum=$(echo "$curfile" |cut -d. -f1)
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable filenum is $filenum."
 		nextnum=$(printf "%05d" $((10#$filenum + 1)))
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable nextnum is $nextnum."
 		prevnum=$(printf "%05d" $((10#$filenum - 1)))
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable prevnum is $prevnum."
 		if [ "$prevnum" -lt 0 ]; then
 			prevnum="00000"
 		fi
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable prevnum is $prevnum."
 		if [ "$nextnum" -gt "$filecount" ]; then
 			nextnum="$(printf "%05d" "$filecount")"
 		fi
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable nextnum is $nextnum."
 		nextfile="$nextnum.mkv"
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable nextfile is $nextfile."
 		prevfile="$prevnum.mkv"
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable prevfile is $prevfile."
 	
 		curdurs=$(ffprobe -v error -select_streams v -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$curfile")
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable curdurs is $curdurs."
 		curframes=$(ffprobe -v error -select_streams v -count_packets -show_entries stream=nb_read_packets -of csv=p=0 "$curfile" |head -n 1)
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable curframes is $curframes."
 		curfrate=$(echo "$curframes / $curdurs" |bc -l)
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable curfrate is $curfrate."
 		nextdurs=$(ffprobe -v error -select_streams v -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$nextfile")
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable nextdurs is $nextdurs."
 		nextframes=$(ffprobe -v error -select_streams v -count_packets -show_entries stream=nb_read_packets -of csv=p=0 "$nextfile" |head -n 1)
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable nextframes is $nextframes."
 		nextfrate=$(echo "$nextframes / $nextdurs" |bc -l)
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable nextfrate is $nextfrate."
 		prevdurs=$(ffprobe -v error -select_streams v -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$prevfile")
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable prevdurs is $prevdurs."
 		prevframes=$(ffprobe -v error -select_streams v -count_packets -show_entries stream=nb_read_packets -of csv=p=0 "$prevfile" |head -n 1)
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable prevframes is $prevframes."
 		prevfrate=$(echo "$prevframes / $prevdurs" |bc -l)
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable prevfrate is $prevfrate."
 
 		cumtime=$(echo "$cumtime + $curdurs" |bc -l)
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable cumtime is $cumtime."
 
 		# PAL - This is very dodgy as I have little PAL material to test with
 		if [ "$(echo "$curfrate <= 26" |bc -l)" -eq 1 ]; then
-			nomfrate="24FPS"
+			nomfrate="24"
 		elif [ "$(echo "$curfrate > 26" |bc -l)" -eq 1 ]; then
-			nomfrate="50FPS"
+			nomfrate="50"
 		else
 			nomfrate="Mix"
 		fi
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable nomfrate is $nomfrate."
 
 	    echo "${line}:${curfile},${curdurs},${cumtime},${curframes},${curfrate},${nomfrate}" >>"$reportfile"
 		line=$((line + 1))
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable line is $line."
+		[ $DEBUGSLOW = 0 ] || sleep 10
 	done
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function getfratespal."
 }
 
 function gettrans {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function gettrans."
 	echo "Finding segments that enclose frame rate transitions..."
 	transfile="$infilename.trans"
+	[ $DEBUG = 0 ] || echo "DEBUG: Variable transfile is $transfile."
 	if [ -f "$transfile" ]; then
 		rm -f "$transfile" || exit 1
 	fi
 	prevrate=$(sed -n 1,1p "$reportfile"|cut -d, -f6)
+	[ $DEBUG = 0 ] || echo "DEBUG: Variable prevrate is $prevrate."
 	for line in $(cat "$reportfile"); do
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable line is $line."
 		currate=$(echo "$line"|cut -d, -f6)
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable currate is $currate."
 		if [ "$currate" != "$prevrate" ]; then
 			echo "$line" >>"$transfile"
 		fi
 		prevrate="$currate"
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable prevrate is $prevrate."
+		[ $DEBUGSLOW = 0 ] || sleep 10
 	done
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function gettrans."
 }
 
 function refinetrans {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function refinetrans."
 	tempmap="$SEGDIR/temp.smap"
+	[ $DEBUG = 0 ] || echo "DEBUG: Variable tempmap is $tempmap."
 	maxmap="$SEGDIR/max.smap"
+	[ $DEBUG = 0 ] || echo "DEBUG: Variable maxmap is $maxmap."
 	mapfile="$rundir/$infilename.smap"
+	[ $DEBUG = 0 ] || echo "DEBUG: Variable mapfile is $mapfile."
 	cumtime=0
 	echo "Making fine adjustments to the transition points..."
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering loop."
 	for line in $(cat "$transfile"); do
 		grep -C1 "$line" "$reportfile" >triplet.txt
 		durstop=$(sed -n 1,1p triplet.txt|cut -d, -f2)
 		dursmid=$(sed -n 2,2p triplet.txt|cut -d, -f2)
 		dursbot=$(sed -n 3,3p triplet.txt|cut -d, -f2)
-		#echo "durs: $durstop, $dursmid, $dursbot"
+		[ $DEBUG = 0 ] || echo "DEBUG: Durations top, mid, bot: $durstop, $dursmid, $dursbot"
 		cumtimetop=$(sed -n 1,1p triplet.txt|cut -d, -f3)
 		cumtimemid=$(sed -n 2,2p triplet.txt|cut -d, -f3)
 		cumtimebot=$(sed -n 3,3p triplet.txt|cut -d, -f3)
-		#echo "cumtime: $cumtimetop, $cumtimemid, $cumtimebot"
-		nomfratetop=$(sed -n 1,1p triplet.txt|cut -d, -f6 |cut -dF -f1)
-		nomfratemid=$(sed -n 2,2p triplet.txt|cut -d, -f6 |cut -dF -f1)
-		nomfratebot=$(sed -n 3,3p triplet.txt|cut -d, -f6 |cut -dF -f1)
-		#echo "nomfrate: $nomfratetop, $nomfratemid, $nomfratebot"
+		[ $DEBUG = 0 ] || echo "DEBUG: Cumulatives top, mid, bot: $cumtimetop, $cumtimemid, $cumtimebot"
+		nomfratetop=$(sed -n 1,1p triplet.txt|cut -d, -f6)
+		nomfratemid=$(sed -n 2,2p triplet.txt|cut -d, -f6)
+		nomfratebot=$(sed -n 3,3p triplet.txt|cut -d, -f6)
+		[ $DEBUG = 0 ] || echo "DEBUG: Nominal rates top, mid, bot: $nomfratetop, $nomfratemid, $nomfratebot"
 		truefratetop=$(sed -n 1,1p triplet.txt|cut -d, -f5)
 		truefratemid=$(sed -n 2,2p triplet.txt|cut -d, -f5)
 		truefratebot=$(sed -n 3,3p triplet.txt|cut -d, -f5)
-		#echo "truefrate: $truefratetop, $truefratemid, $truefratebot"
+		[ $DEBUG = 0 ] || echo "DEBUG: True rates top, mid, bot: $truefratetop, $truefratemid, $truefratebot"
 		fratedifftop="$(echo "$truefratetop - $nomfratetop" |bc -l)"
 		fratediffmid="$(echo "$truefratemid - $nomfratemid" |bc -l)"
 		fratediffbot="$(echo "$truefratebot - $nomfratebot" |bc -l)"
-		#echo "fratediff: $fratedifftop, $fratediffmid, $fratediffbot"
+		[ $DEBUG = 0 ] || echo "DEBUG: Rate diffs top, mid, bot: $fratedifftop, $fratediffmid, $fratediffbot"
 		if [ "$(echo "$fratedifftop < 0" |bc -l)" -eq 1 ]; then
 			absdifftop="$(echo "$fratedifftop * -1" |bc -l)"
 		else
@@ -268,80 +390,93 @@ function refinetrans {
 		else
 			absdiffbot="$fratediffbot"
 		fi
-		#echo "absdiff: $absdifftop, $absdiffmid, $absdiffbot"
+		[ $DEBUG = 0 ] || echo "DEBUG: Absolute diffs top, mid, bot: $absdifftop, $absdiffmid, $absdiffbot"
 		# Which segment is really transitional?
 		if [ "$(echo "$absdifftop > $absdiffmid" |bc -l)" -eq 1 ] && [ "$(echo "$absdifftop > $absdiffbot" |bc -l)" -eq 1 ]; then
 			duration="$durstop"
 			truefrate="$truefratetop"
 			cumtime="$cumtimetop"
-			#echo "top"
+			[ $DEBUG = 0 ] || echo "DEBUG: Top is transitional."
 		elif [ "$(echo "$absdiffmid > $absdifftop" |bc -l)" -eq 1 ] && [ "$(echo "$absdiffmid > $absdiffbot" |bc -l)" -eq 1 ]; then
 			duration="$dursmid"
 			truefrate="$truefratemid"
 			cumtime="$cumtimemid"
-			#echo "mid"
+			[ $DEBUG = 0 ] || echo "DEBUG: Mid is transitional."
 		else
 			duration="$dursbot"
 			truefrate="$truefratebot"
 			cumtime="$cumtimebot"
-			#echo "bot"
+			[ $DEBUG = 0 ] || echo "DEBUG: Bottom is transitional."
 		fi
-		#echo "$duration, $truefrate, $cumtime"
+		[ $DEBUG = 0 ] || echo "DEBUG: Transitional stats: $duration, $truefrate, $cumtime"
 		# Adjust the time at the transitional segment
 		ratediff="$(echo "$truefrate - 23.976" |bc -l)"
-		#echo "ratediff: $ratediff"
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable ratediff is $ratediff."
 		if [ "$(echo "$ratediff < 0" |bc -l)" -eq 1 ]; then
 			difffrac=0
 		else
 			difffrac="$(echo "$ratediff / 5.99" |bc -l)"
 		fi
-		#echo "diffrac: $difffrac"
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable difffrac is $difffrac."
 		timeadj="$(echo "$duration * $difffrac" |bc -l)"
-		#echo "timeadj: $timeadj"
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable timeadj is $timeadj."
 		if [ "$(echo "$nomfratetop > $nomfratebot" |bc -l)" -eq 1 ]; then
-			# 30 to 24
+			[ $DEBUG = 0 ] || echo "DEBUG: Direction is down (30 to 24)."
 			modadj="$(echo "$duration - $timeadj" |bc -l)"
 		else
-			# 24 to 30
+			[ $DEBUG = 0 ] || echo "DEBUG: Direction is up (24 to 30)."
 			modadj="$timeadj"
 		fi
-		#echo "modadj: $modadj"
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable modadj is $modadj."
 		cumtimefinal="$(echo "$cumtime - $modadj" |bc -l)"
-		#echo "$cumtime, $cumtimefinal"
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable cumtimefinal is $cumtimefinal."
 		echo "$cumtimefinal" >>"$tempmap"
-		#echo "Experimental time adjustment ends here."
+		[ $DEBUGSLOW = 0 ] || sleep 10
 	done
+	[ $DEBUG = 0 ] || echo "DEBUG: Exiting loop."
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function refinetrans."
 }
 
 function makemap {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function makemap."
 	# Drop short segments and write the maxedlist
 	prevtime=0
 	# Apply MINSEG to tempmap
 	touch "$maxmap"
 	for time in $(cat "$tempmap"); do
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable time is $time."
 		timediff="$(echo "$time - $prevtime" |bc -l)"
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable timediff is $timediff."
 		if [ "$(echo "$timediff >= $MINSEG" |bc -l)" -eq 1 ]; then
 			echo "$time" >>"$maxmap"
 		else
 			sed -i '$d' "$maxmap"
 		fi
 		prevtime="$time"
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable prevtime is $prevtime."
+		[ $DEBUGSLOW = 0 ] || sleep 10
 	done
 
 	# Build the segmap from the maxedlist
 	echo -n "start," >"$mapfile"
 	for time in $(cat "$maxmap"); do
+		[ $DEBUG = 0 ] || echo "DEBUG: Variable time is $time."
 		echo "$time" >>"$mapfile"
 		echo -n "$time," >>"$mapfile"
+		[ $DEBUGSLOW = 0 ] || sleep 10
 	done
 	echo "end" >>"$mapfile"
 	if [ -f "$mapfile" ] && [ "$SUDO_USER" ]; then
 		chown "$SUDO_USER" "$mapfile"
 	fi
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function makemap."
 }
 
+[ $DEBUG = 0 ] || echo "DEBUG: Starting smap run."
 IFS=$'\n'
+umask 0000
 rundir="$(pwd)"
+[ $DEBUG = 0 ] || echo "DEBUG: Variable rundir is $rundir."
 
 if [ "$OUTDIR" == "CHANGEME" ]; then
 	echo "ERROR: You need to set OUTDIR to your output directory at the top of the script."
@@ -349,7 +484,10 @@ if [ "$OUTDIR" == "CHANGEME" ]; then
 fi
 
 infile="$1"
+[ $DEBUG = 0 ] || echo "DEBUG: Variable infile is $infile."
+
 infilename="$(echo $infile |cut -d. -f1)"
+[ $DEBUG = 0 ] || echo "DEBUG: Variable infilename is $infilename."
 
 if [ ! -f "$infile" ]; then
 	echo "ERROR: No input file specified.  Run 'segmapper <file>'"
@@ -359,48 +497,75 @@ fi
 # Make sure the system has at least 16GB or disable the ramdisk
 if [ "$USERAMDISK" == 1 ]; then
 	sysmem=$(free --giga |grep Mem |awk '/^Mem:/{print $2}')
+	[ $DEBUG = 0 ] || echo "DEBUG: Variable sysmem is $sysmem."
 	if [ "$sysmem" -lt "16" ]; then
 		echo "The USERAMDISK option has been disabled due to insufficient memory."
 		USERAMDISK=0
 	fi
 fi
 
+trap cleanup EXIT
+trap exit SIGINT
+trap debugtoggle SIGUSR1
+trap debugslowtoggle SIGUSR2
+
 if [[ ! -z $dsegsize ]]; then
+	[ $DEBUG = 0 ] || echo "DEBUG: Variable dsegsize is $dsegsize."
 	SEGSIZE="$dsegsize"
 fi
+
 if [[ ! -z $dminseg ]]; then
+	[ $DEBUG = 0 ] || echo "DEBUG: Variable dminseg is $dminseg."
 	MINSEG="$dminseg"
 fi
 
+echo "Process ID is $$."
 timein="$(date +%s)"
+[ $DEBUG = 0 ] || echo "DEBUG: Variable timein is $timein."
+
+[ $DEBUG = 0 ] || echo "DEBUG: Calling function setup."
 setup
+
+[ $DEBUG = 0 ] || echo "DEBUG: Calling function reportsettings."
 reportsettings
+
 sleep 3
+[ $DEBUG = 0 ] || echo "DEBUG: Calling function makesegs."
 makesegs
 
 cd $SEGDIR || exit 1
+[ $DEBUG = 0 ] || echo "DEBUG: Calling function getstandard."
 getstandard
 
 cumtime=0
 line=0
 reportfile="$infilename.rates"
+[ $DEBUG = 0 ] || echo "DEBUG: Variable reportfile is $reportfile."
+
 filecount=$(($(ls -1 *.mkv |wc -l) - 1))
+[ $DEBUG = 0 ] || echo "DEBUG: Variable filecount is $filecount."
+
 if [ "$standard" == "NTSC" ]; then
+	[ $DEBUG = 0 ] || echo "DEBUG: Calling function getfratesntsc."
 	getfratesntsc
 else
+	[ $DEBUG = 0 ] || echo "DEBUG: Calling function getfratespal."
 	getfratespal
 fi
 
+[ $DEBUG = 0 ] || echo "DEBUG: Calling function gettrans."
 gettrans
+
+[ $DEBUG = 0 ] || echo "DEBUG: Calling function refinetrans."
 refinetrans
+
+[ $DEBUG = 0 ] || echo "DEBUG: Calling function makemap."
 makemap
 
 timeout="$(date +%s)"
+[ $DEBUG = 0 ] || echo "DEBUG: Variable timeout is $timeout."
+
 runtime=$((timeout - timein))
 echo "Segment mapper completed analysis in $runtime seconds."
 
-if [ "$USERAMDISK" == 1 ] && [ "$KEEPRAMDISK" == 0 ]; then
-	cd "$rundir"
-	echo "Unmounting memory filesystem.  You may be prompted to authenticate if not root."
-	sudo umount "$SEGDIR"
-fi
+[ $DEBUG = 0 ] || echo "DEBUG: Exiting smap."
