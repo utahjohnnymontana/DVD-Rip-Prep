@@ -22,11 +22,11 @@ RATELOCK="0.0001"
 STRICT=1
 AUTOMAP=1
 KEEPTEMP=0
-FROUTS=(24 30 60 120)
+FROUTS="OFF"
 DEBUG=0
 DEBUGSLOW=0
 MAPPER="$(dirname "$0")/smap"
-OUTDIR="CHANGEME"
+OUTDIR="/home/bill/data/2process"
 
 # Best not to change the following settings unless you know what you're doing
 TEMPROOT="$OUTDIR/00DRP"
