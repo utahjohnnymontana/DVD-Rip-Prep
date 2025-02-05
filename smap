@@ -1,5 +1,5 @@
 #!/bin/bash
-# smap (Segment Mapper) bash script - Feb. 4 2025
+# smap (Segment Mapper) bash script - Feb. 5 2025
 #
 # This script attempts to analyze an MKV file produced by MakeMKV from a DVD 
 # source and find where the original frame rates and interlacing methods change

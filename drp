@@ -1,5 +1,5 @@
 #!/bin/bash
-# drp (DVD Rip Prep) bash script - Feb. 4 2025
+# drp (DVD Rip Prep) bash script - Feb. 5 2025
 #
 # This script attempts to take an MKV file produced by MakeMKV from a DVD source
 # and output a new file without telecine or interlacing and at the correct frame
@@ -22,11 +22,11 @@ RATELOCK="0.0001"
 STRICT=1
 AUTOMAP=1
 KEEPTEMP=0
-FROUTS="OFF"
+FROUTS=(24 30 60 120)
 DEBUG=0
 DEBUGSLOW=0
 MAPPER="$(dirname "$0")/smap"
-OUTDIR="/home/bill/data/2process"
+OUTDIR="CHANGEME"
 
 # Best not to change the following settings unless you know what you're doing
 TEMPROOT="$OUTDIR/00DRP"
