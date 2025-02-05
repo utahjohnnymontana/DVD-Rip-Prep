@@ -1,5 +1,5 @@
 #!/bin/bash
-# smap (Segment Mapper) bash script - Jan. 26 2025
+# smap (Segment Mapper) bash script - Feb. 4 2025
 #
 # This script attempts to analyze an MKV file produced by MakeMKV from a DVD 
 # source and find where the original frame rates and interlacing methods change
@@ -118,12 +118,21 @@ function checkinterlace {
 	if [ -f "$SEGDIR/idet.grep" ]; then
 		rm -f "$SEGDIR/idet.grep"
 	fi
-	ffmpeg -an -sn \
-		-hide_banner \
-		-stats \
-		-filter:v "idet=intl_thres=1.01:rep_thres=1.1" \
-		-f null - \
-		-i "$file" 2>"$SEGDIR/idet.out"
+	if [ "$anim" = 1 ]; then
+		ffmpeg -an -sn \
+			-hide_banner \
+			-stats \
+			-filter:v "idet=intl_thres=1.1:rep_thres=1.1" \
+			-f null - \
+			-i "$file" 2>"$SEGDIR/idet.out"
+	else
+		ffmpeg -an -sn \
+			-hide_banner \
+			-stats \
+			-filter:v "idet=intl_thres=1.05:rep_thres=1.1" \
+			-f null - \
+			-i "$file" 2>"$SEGDIR/idet.out"
+	fi
 	grep -m4 "Parsed_idet" "$SEGDIR/idet.out" >"$SEGDIR/idet.grep"
 	gl1=$(grep "Final flag accuracy" "$SEGDIR/idet.out")
 	gl2=$(grep "Repeated Fields:" "$SEGDIR/idet.out")
@@ -171,12 +180,24 @@ function checkinterlace {
 	[ $DEBUG = 0 ] || echo "DEBUG: Variable pctintl is $pctintl."
 	pctintltr="$(printf "%.0f\n" "$pctintl")"
 	[ $DEBUG = 0 ] || echo "DEBUG: Variable pctintltr is $pctintltr."
-	if [ "$(echo "$pcthtc >= 8" |bc -l)" -eq 1 ] && [ "$(echo "$pctintl > 0" |bc -l)" -eq 1 ]; then
-		type="HTC"
-	elif [ "$(echo "$pctintl > 0" |bc -l)" -eq 1 ]; then
-		type="INT"
+	if [ "$anim" = 1 ]; then
+		if [ "$nomfrate" = 24 ] && [ "$(echo "$pcthtc == 0" |bc -l)" -eq 1 ] && [ "$(echo "$pctintl == 0" |bc -l)" -eq 1 ]; then
+			type="STC"
+		elif [ "$(echo "$pcthtc > 0" |bc -l)" -eq 1 ]; then
+			type="HTC"
+		elif [ "$(echo "$pctintl > 0" |bc -l)" -eq 1 ]; then
+			type="INT"
+		else
+			type="BDTC"
+		fi
 	else
-		type="BDTC"
+		if [ "$(echo "$pcthtc >= 8" |bc -l)" -eq 1 ] && [ "$(echo "$pctintl > 0" |bc -l)" -eq 1 ]; then
+			type="HTC"
+		elif [ "$(echo "$pctintl > 0" |bc -l)" -eq 1 ]; then
+			type="INT"
+		else
+			type="BDTC"
+		fi
 	fi
 	[ $DEBUG = 0 ] || echo "DEBUG: Variable type is $type."
 	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function checkinterlace."
@@ -327,7 +348,7 @@ function getfratesntsc {
 		else
 			nomfrate="27"
 		fi
-		if [ "$nomfrate" = 30 ]; then
+		if [ "$nomfrate" = 30 ] || [ "$anim" = 1 ]; then
 			checkinterlace
 		elif [ "$nomfrate" = "27" ]; then
 			type="TRN"
