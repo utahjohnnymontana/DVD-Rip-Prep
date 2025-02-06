@@ -1,5 +1,5 @@
 #!/bin/bash
-# smap (Segment Mapper) bash script - Feb. 5 2025
+# smap (Segment Mapper) bash script - Feb. 6 2025
 #
 # This script attempts to analyze an MKV file produced by MakeMKV from a DVD 
 # source and find where the original frame rates and interlacing methods change
@@ -16,7 +16,7 @@ DEBUGSLOW=0
 
 # Set directories if not exported from drp (i.e. if not running smap directly)
 if [ ! "$OUTDIR" ]; then
-	OUTDIR="/home/bill/data/2process"
+	OUTDIR="CHANGEME"
 fi
 if [ ! "$TEMPROOT" ]; then
 	TEMPROOT="$OUTDIR/00DRP"
@@ -38,6 +38,9 @@ function setup {
 	fi
 	if [ ! -d "$TEMPDIR" ]; then
 		mkdir "$TEMPDIR" || exit 1
+	fi
+	if [ ! -d "$STAGE1DIR" ]; then
+		mkdir "$STAGE1DIR" || exit 1
 	fi
 	if [ ! -d "$LOGDIR" ]; then
 		mkdir "$LOGDIR" || exit 1
