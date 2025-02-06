@@ -1,5 +1,5 @@
 #!/bin/bash
-# drp (DVD Rip Prep) bash script - Feb. 5 2025
+# drp (DVD Rip Prep) bash script - Feb. 6 2025
 #
 # This script attempts to take an MKV file produced by MakeMKV from a DVD source
 # and output a new file without telecine or interlacing and at the correct frame
@@ -604,8 +604,13 @@ function baddetelecine {
 	bestdiff=100
 	tryalt=0
 	filmframes=$((filmframes + inframes))
+	if [ "$stage" -eq 1 ]; then
+		methodlist=(baddtc2 baddtc3 baddtc4 baddtc5 baddtc6)
+	else
+		methodlist=(baddtc1 baddtc2 baddtc3 baddtc4 baddtc5 baddtc6 baddtc7)
+	fi
 	local submethod
-	for submethod in baddtc1 baddtc2 baddtc3 baddtc4 baddtc5 baddtc6 baddtc7; do
+	for submethod in "${methodlist[@]}"; do
 		echo "Trying submethod $submethod..."
 		"$submethod" "$infile"
 		checkduration "$infile" "$outfile"
@@ -849,8 +854,13 @@ function hardtelecine {
 	bestdiff=100
 	tryalt=0
 	filmframes=$((filmframes + inframes))
+	if [ "$stage" -eq 1 ]; then
+		methodlist=(hdtc1 hdtc2 hdtc3 hdtc4 hdtc5 hdtc6 hdtc7 hdtc8)
+	else
+		methodlist=(hdtc0 hdtc1 hdtc2 hdtc3 hdtc4 hdtc5 hdtc6 hdtc7 hdtc8 hdtc9)
+	fi
 	local submethod
-	for submethod in hdtc0 hdtc1 hdtc2 hdtc3 hdtc4 hdtc5 hdtc6 hdtc7 hdtc8 hdtc9; do
+	for submethod in "${methodlist[@]}"; do
 		echo "Trying submethod $submethod..."
 		"$submethod" "$infile"
 		checkduration "$infile" "$outfile"
@@ -1022,8 +1032,13 @@ function ntscinterlaced {
 	bestdiff=100
 	tryalt=0
 	vidframes=$((vidframes + inframes))
+	if [ "$stage" -eq 1 ]; then
+		methodlist=(ntsci1 ntsci2 ntsci3 ntsci4 ntsci5 ntsci6)
+	else
+		methodlist=(ntsci0 ntsci1 ntsci2 ntsci3 ntsci4 ntsci5 ntsci6)
+	fi
 	local submethod
-	for submethod in ntsci0 ntsci1 ntsci2 ntsci3 ntsci4 ntsci5 ntsci6; do
+	for submethod in "${methodlist[@]}"; do
 		echo "Trying submethod $submethod..."
 		"$submethod" "$infile"
 		checkduration "$infile" "$outfile"
@@ -1336,8 +1351,13 @@ function softinterlaced {
 	bestdiff=100
 	tryalt=0
 	filmframes=$((filmframes + inframes))
+	if [ "$stage" -eq 1 ]; then
+		methodlist=(sdi1 sdi2 sdi3 sdi4)
+	else
+		methodlist=(sdi0 sdi1 sdi2 sdi3 sdi4)
+	fi
 	local submethod
-	for submethod in sdi0 sdi1 sdi2 sdi3 sdi4; do
+	for submethod in "${methodlist[@]}"; do
 		echo "Trying submethod $submethod..."
 		"$submethod" "$infile"
 		checkduration "$infile" "$outfile"
@@ -1471,8 +1491,13 @@ function softtelecine {
 	bestdiff=100
 	tryalt=0
 	filmframes=$((filmframes + inframes))
+	if [ "$stage" -eq 1 ]; then
+		methodlist=(sdtc1 sdtc2 sdtc3 sdtc4 sdtc5)
+	else
+		methodlist=(sdtc0 sdtc1 sdtc2 sdtc3 sdtc4 sdtc5 sdtc6)
+	fi
 	local submethod
-	for submethod in sdtc0 sdtc1 sdtc2 sdtc3 sdtc4 sdtc5 sdtc6; do
+	for submethod in "${methodlist[@]}"; do
 		echo "Trying submethod $submethod..."
 		"$submethod" "$infile"
 		checkduration "$infile" "$outfile"
@@ -1602,15 +1627,15 @@ function finalize {
 			if [ "$filmframes" -gt 0 ] && [ "$vidframes" -eq 0 ]; then
 				outfps="$FILMFPS"
 				fpslabel="24FPS"
-				echo "All segments are film rate, so outputting at 24 FPS."
+				echo;echo "All segments are film rate, so outputting at 24 FPS."
 			elif [ "$filmframes" -eq 0 ] && [ "$vidframes" -gt 0 ]; then
 				outfps="$IVIDFPS"
 				fpslabel="60FPS"
-				echo "All segments are video rate, so outputting at 60 FPS."
+				echo;echo "All segments are video rate, so outputting at 60 FPS."
 			else
 				outfps="$MAXFPS"
 				fpslabel="120FPS"
-				echo "Segments mix film and video rates, so outputting at 120 FPS."
+				echo;echo "Segments mix film and video rates, so outputting at 120 FPS."
 			fi
 			finname="$(echo "$orgfile" |cut -d. -f1)"
 			finfile="$OUTDIR/${finname}-$fpslabel-rejoined.mkv"
