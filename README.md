@@ -28,6 +28,8 @@ Now that I have something that works pretty well, the next big step might be to 
 
 The script will now adust any audio and subtitle tracks in the source video to match the output duration.  Usually, the difference amounts to tenths of a second at most and this makes no noticeable difference, but there is the occasional video that comes out with a duration that differs by half a second or more, even when every segment has matching input and output durations.  I have not been able to figure out why this happens, so I finally took the easiest path and just adjusted the other tracks to match.  This is not an ideal solution, since it means that the audio must be reencoded, but it is the only solution that I have come up with so far.  Of course, if your videos are the typical close match, you can just merge over the original audio tracks instead.  There is a new setting, MATCHTRACKS, that can be used to disable this feature.
 
+PAL conversion has also been improved.  All audio and subtitle tracks are new adjusted to the new frame rate.
+
 ## Background
 
 To understand why this exists, you need to know a few things about video, DVDs, and upscaling.  Until recently, most movies and TV shows were shot on film, at a frame rate of 24 FPS (actually ~23.976025 or 24000/1001).  The rate at which TV screens refresh is tied to the cycle rate of the power that they use.  In North America, this was 30 FPS (~29.97003 or 30000/1001) and, in Europe, it was 25 FPS.  The North American standard is known as NTSC and the European standard is PAL.  There are other standards as well.  Screens are now somewhat more flexible than in the days of tube TVs, but we still live in a world where the standards were set in the past.  The problem here is that the rate at which the video was recorded and the rate at which is is displayed are different.  Several methods are used to make 24 FPS video play at 30 FPS or 25 FPS.  In North America, we used telecine to make 24 FPS content play like 30 FPS.  In Europe, since 24 and 25 FPS are so close, they usually just played 24 FPS content at 25 FPS. The video and audio play about 4% faster, but the difference isn't very noticeable.
@@ -102,11 +104,9 @@ By default, the final output of the script will be both a "rejoined" MKV that co
 
 #### PAL Conversion
 
-As far as I can tell, any content that you find on a PAL format DVD that was originally shot on film is just sped up from 24 to 25 FPS.  Drp will convert this by slowing the video back down to 24 FPS.  It will also output an audio file that is slowed to the same rate so that you can ensure that the audio still syncs up.  Assuming that the DVD contains multiple audio and subtitle tracks, you will need to slow those down to match the video.  I recommend doing this with MKVtoolnix using the stretch option.  Just enter 1.042708333 (25/(24000/1001)) for the stretch value for each track.  If you don't want PAL conversion, set CONVPAL to 0 in the drp script.
+As far as I can tell, any content that you find on a PAL format DVD that was originally shot on film is just sped up from 24 to 25 FPS.  Drp will convert this by slowing the video back down to 24 FPS.  It will also adjust all audio and subtitle tracks to match the new duration.  If you don't want PAL conversion, set CONVPAL to 0 in the drp script.
 
 Converted interlaced PAL video will be output at two frame rates: 24FPS and 48FPS.  This is because there is no easy way to determine whether the source was originally produced on video with different interlaced fields or if it was filmed and the interlaced fields produced by splitting frames.  In general, material that was shot on film will look best at 24FPS and material that was shot on video will look best at 48FPS.  You should keep the frame rate that looks best to you.
-
-I plan to improve PAL conversion in the future so that all audio and subtitles are converted automatically.  I just don't have a lot of PAL DVDs, so it hasn't been a high priority.
 
 ## Installation
 
