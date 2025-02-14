@@ -1,5 +1,5 @@
 #!/bin/bash
-# drp (DVD Rip Prep) bash script - Feb. 6 2025
+# drp (DVD Rip Prep) bash script - Feb. 12 2025
 #
 # This script attempts to take an MKV file produced by MakeMKV from a DVD source
 # and output a new file without telecine or interlacing and at the correct frame
@@ -21,8 +21,9 @@ MERGEMKV=1
 RATELOCK="0.0001"
 STRICT=1
 AUTOMAP=1
-KEEPTEMP=0
+KEEPTEMP=1
 FROUTS=(24 30 60 120)
+MATCHTRACKS=1
 DEBUG=0
 DEBUGSLOW=0
 MAPPER="$(dirname "$0")/smap"
@@ -35,6 +36,7 @@ LOGDIR="$TEMPDIR/LOGS"
 STAGE1DIR="$TEMPDIR/STAGE1"
 STAGE2DIR="$TEMPDIR/STAGE2"
 STAGE3DIR="$TEMPDIR/STAGE3"
+STAGE4DIR="$TEMPDIR/STAGE4"
 PRELOG="/tmp/prelog.$(date +%s)"
 
 FILMFPS="$(echo "24000 / 1001" |bc -l)"
@@ -89,6 +91,9 @@ function setup {
 	if [ ! -d "$STAGE3DIR" ] && [ "$dryrun" != 1 ]; then
 		mkdir "$STAGE3DIR" || exit 1
 	fi
+	if [ ! -d "$STAGE4DIR" ] && [ "$dryrun" != 1 ]; then
+		mkdir "$STAGE4DIR" || exit 1
+	fi
 	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function setup."
 }
 
@@ -142,6 +147,7 @@ function reportsettings {
 	echo "STAGE1DIR is $STAGE1DIR" |tee -a "$PRELOG"
 	echo "STAGE2DIR is $STAGE2DIR" |tee -a "$PRELOG"
 	echo "STAGE3DIR is $STAGE3DIR" |tee -a "$PRELOG"
+	echo "STAGE4DIR is $STAGE4DIR" |tee -a "$PRELOG"
 	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function reportsettings."
 }
 
@@ -167,6 +173,14 @@ function cleanup {
 	if [ -d "$STAGE3DIR" ] && [ "$dryrun" != 1 ]; then
 		cd "$STAGE3DIR" || exit 1
 		if [ "$(pwd)" == "$STAGE3DIR" ]; then
+			for file in *; do
+				rm -f "$file"
+			done
+		fi
+	fi
+	if [ -d "$STAGE4DIR" ] && [ "$dryrun" != 1 ]; then
+		cd "$STAGE4DIR" || exit 1
+		if [ "$(pwd)" == "$STAGE4DIR" ]; then
 			for file in *; do
 				rm -f "$file"
 			done
@@ -354,7 +368,7 @@ function analyzentsc {
 		echo "$infile,$invres,$infrate,$pctintl,$pcthtc,Short packet" >>"$diagfile"
 		runmethod="passthrough"
 	elif [ "$nomfrate" == "24" ]; then
-		if [ "$(echo "$pctintl > 1" |bc -l)" -eq 1 ]; then
+		if [ "$(echo "$pctintl > 1" |bc -l)" -eq 1 ] && [ "$(echo "$inframes <= 48" |bc -l)" -eq 1 ]; then
 			echo "Diagnosis: Soft telecined with interlaced borders or transitions." |tee -a "$logfile"
 			echo "$infile,$invres,$infrate,$pctintl,$pcthtc,Partially interlaced video" >>"$diagfile"
 			runmethod="softinterlaced"
@@ -427,6 +441,8 @@ function mixed {
 	inname="$(echo "$infile" |cut -d. -f1)"
 	reportname="${inname}-mixed-report.txt"
 	reportfile="$OUTDIR/$reportname"
+	echo "Working file: $infile" >>"$reportfile"
+	echo >>"$reportfile"
 	if [ "$stage" = 1 ]; then
 		stage=2
 		[ $DEBUG = 0 ] || echo "DEBUG: Variable stage is $stage."
@@ -457,10 +473,10 @@ function checkduration {
 	fi
 	pctdiff=$(echo "($absdiff / $incddurs) * 100" |bc -l)
 	if [ "$rtdiff" == "0" ]; then
-		echo "Output duration matches input.  That's good." |tee -a "$logfile"
+		#echo "Output duration matches input.  That's good." |tee -a "$logfile"
 		tryalt=0
 	else
-		echo "WARNING: Output and input durations do not match: out $outcddurs vs in $incddurs" |tee -a "$logfile"
+		#echo "WARNING: Output and input durations do not match: out $outcddurs vs in $incddurs" |tee -a "$logfile"
 		tryalt=1
 	fi
 	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function checkduration."
@@ -504,11 +520,11 @@ function baddtc2 {
 	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function baddtc2."
 }
 
-function baddtc3 {
-	[ $DEBUG = 0 ] || echo "DEBUG: Entering function baddtc3."
+function baddtc2.1 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function baddtc2.1."
 	local infile="$1"
 	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-30fps-baddtc3-ffv1"
+	outpart="${inname}-30fps-baddtc2.1-ffv1"
 	outname="${outpart}.mkv"
 	outfile="$STAGE3DIR/$outname"
 	ffmpeg -n \
@@ -520,14 +536,14 @@ function baddtc3 {
 		-vf "decimate" \
 		-r "$VIDFPS" \
 		-c:v ffv1 "$outfile"
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function baddtc3."
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function baddtc2.1."
 }
 
-function baddtc4 {
-	[ $DEBUG = 0 ] || echo "DEBUG: Entering function baddtc4."
+function baddtc2.2 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function baddtc2.2."
 	local infile="$1"
 	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-48fps-baddtc4-ffv1"
+	outpart="${inname}-48fps-baddtc2.2-ffv1"
 	outname="${outpart}.mkv"
 	outfile="$STAGE3DIR/$outname"
 	ffmpeg -n \
@@ -539,14 +555,14 @@ function baddtc4 {
 		-vf "decimate" \
 		-r "$FDBLFPS" \
 		-c:v ffv1 "$outfile"
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function baddtc4."
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function baddtc2.2."
 }
 
-function baddtc5 {
-	[ $DEBUG = 0 ] || echo "DEBUG: Entering function baddtc5."
+function baddtc2.3 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function baddtc2.3."
 	local infile="$1"
 	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-60fps-baddtc5-ffv1"
+	outpart="${inname}-60fps-baddtc2.3-ffv1"
 	outname="${outpart}.mkv"
 	outfile="$STAGE3DIR/$outname"
 	ffmpeg -n \
@@ -558,14 +574,14 @@ function baddtc5 {
 		-vf "decimate" \
 		-r "$IVIDFPS" \
 		-c:v ffv1 "$outfile"
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function baddtc5."
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function baddtc2.3."
 }
 
-function baddtc6 {
-	[ $DEBUG = 0 ] || echo "DEBUG: Entering function baddtc6."
+function baddtc2.4 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function baddtc2.4."
 	local infile="$1"
 	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-120fps-baddtc6-ffv1"
+	outpart="${inname}-120fps-baddtc2.4-ffv1"
 	outname="${outpart}.mkv"
 	outfile="$STAGE3DIR/$outname"
 	ffmpeg -n \
@@ -577,15 +593,15 @@ function baddtc6 {
 		-vf "decimate" \
 		-r "$MAXFPS" \
 		-c:v ffv1 "$outfile"
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function baddtc6."
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function baddtc2.4."
 }
 
-function baddtc7 {
-	# If all else failed, this is probably just black screen
+function baddtc3 {
+	# If all else failed, this is probably just black screen, so pass it unchanged
 	[ $DEBUG = 0 ] || echo "DEBUG: Entering function baddtc6."
 	local infile="$1"
 	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-passthrough-baddtc7-ffv1"
+	outpart="${inname}-passthrough-baddtc3-ffv1"
 	outname="${outpart}.mkv"
 	outfile="$STAGE3DIR/$outname"
 	ffmpeg -n \
@@ -595,7 +611,7 @@ function baddtc7 {
 		-i "$infile" \
 		-an -sn \
 		-c:v ffv1 "$outfile"
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function baddtc7."
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function baddtc3."
 }
 
 function baddetelecine {
@@ -605,9 +621,9 @@ function baddetelecine {
 	tryalt=0
 	filmframes=$((filmframes + inframes))
 	if [ "$stage" -eq 1 ]; then
-		methodlist=(baddtc2 baddtc3 baddtc4 baddtc5 baddtc6)
+		methodlist=(baddtc2 baddtc2.1 baddtc2.2 baddtc2.3 baddtc2.4)
 	else
-		methodlist=(baddtc1 baddtc2 baddtc3 baddtc4 baddtc5 baddtc6 baddtc7)
+		methodlist=(baddtc1 baddtc2 baddtc2.1 baddtc2.2 baddtc2.3 baddtc2.4 baddtc3)
 	fi
 	local submethod
 	for submethod in "${methodlist[@]}"; do
@@ -623,14 +639,17 @@ function baddetelecine {
 		if [ "$stage" = 1 ] && [ "$(echo "$pctdiff <= $ALLOWLOSS" |bc -l)" -eq 1 ]; then
 			break
 		fi
-		if [ "$tryalt" = 1 ] && [ "$submethod" != "baddtc7" ]; then
-			echo "Submethod $submethod produced a bad duration."
+		if [ "$tryalt" = 1 ] && [ "$stage" -eq 1 ] && [ "$submethod" != "baddtc2.4" ]; then
+			echo "Submethod $submethod produced a bad duration: $bestcddurs vs. $incddurs"
+		elif [ "$tryalt" = 1 ] && [ "$submethod" != "baddtc3" ]; then
+			echo "Submethod $submethod produced a bad duration: $bestcddurs vs. $incddurs"
 		elif [ "$tryalt" = 1 ]; then
 			echo "No method produced a good duration.  Using the best bad result: $bestcddurs vs. $incddurs"
-			echo -n ",$submethod" >>"$reportfile"
+			echo ",$incddurs,$bestcddurs,$submethod" >>"$reportfile"
 		else
 			echo "Submethod $submethod produced a good duration: $bestcddurs vs. $incddurs"
-			echo -n ",$submethod" >>"$reportfile"
+			echo ",$incddurs,$bestcddurs,$submethod" >>"$reportfile"
+			if [ -f /home/bill/dvdripprep/mtrack.txt ]; then echo "$submethod" >>/home/bill/dvdripprep/mtrack.txt; fi
 			break
 		fi
 	done
@@ -643,11 +662,11 @@ function baddetelecine {
 	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function baddetelecine."
 }
 
-function hdtc0 {
+function hdtc1 {
 	[ $DEBUG = 0 ] || echo "DEBUG: Entering function hdtc1."
 	local infile="$1"
 	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-matched-hdtc0-ffv1"
+	outpart="${inname}-matched-hdtc1-ffv1"
 	outname="${outpart}.mkv"
 	outfile="$STAGE3DIR/$outname"
 	ffmpeg -n \
@@ -659,14 +678,14 @@ function hdtc0 {
 		-vf "fieldmatch,decimate,bwdif=mode=send_frame:deint=interlaced" \
 		-r "$infrate" \
 		-c:v ffv1 "$outfile"
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function hdtc0."
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function hdtc1."
 }
 
-function hdtc1 {
-	[ $DEBUG = 0 ] || echo "DEBUG: Entering function hdtc1."
+function hdtc2 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function hdtc2."
 	local infile="$1"
 	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-24fps-hdtc1-ffv1"
+	outpart="${inname}-24fps-hdtc2-ffv1"
 	outname="${outpart}.mkv"
 	outfile="$STAGE3DIR/$outname"
 	ffmpeg -n \
@@ -678,14 +697,14 @@ function hdtc1 {
 		-vf "fieldmatch,decimate,bwdif=mode=send_frame:deint=interlaced" \
 		-r "$FILMFPS" \
 		-c:v ffv1 "$outfile"
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function hdtc1."
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function hdtc2."
 }
 
-function hdtc2 {
-	[ $DEBUG = 0 ] || echo "DEBUG: Entering function hdtc2."
+function hdtc2.1 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function hdtc2.1."
 	local infile="$1"
 	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-30fps-hdtc2-ffv1"
+	outpart="${inname}-30fps-hdtc2.1-ffv1"
 	outname="${outpart}.mkv"
 	outfile="$STAGE3DIR/$outname"
 	ffmpeg -n \
@@ -697,14 +716,14 @@ function hdtc2 {
 		-vf "fieldmatch,decimate,bwdif=mode=send_field:deint=interlaced" \
 		-r "$VIDFPS" \
 		-c:v ffv1 "$outfile"
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function hdtc2."
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function hdtc2.1."
 }
 
-function hdtc3 {
-	[ $DEBUG = 0 ] || echo "DEBUG: Entering function hdtc3."
+function hdtc2.2 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function hdtc2.2."
 	local infile="$1"
 	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-60fps-hdtc3-ffv1"
+	outpart="${inname}-60fps-hdtc2.2-ffv1"
 	outname="${outpart}.mkv"
 	outfile="$STAGE3DIR/$outname"
 	ffmpeg -n \
@@ -716,14 +735,14 @@ function hdtc3 {
 		-vf "fieldmatch,decimate,bwdif=mode=send_field:deint=interlaced" \
 		-r "$IVIDFPS" \
 		-c:v ffv1 "$outfile"
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function hdtc3."
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function hdtc2.2."
 }
 
-function hdtc4 {
-	[ $DEBUG = 0 ] || echo "DEBUG: Entering function hdtc4."
+function hdtc2.3 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function hdtc2.3."
 	local infile="$1"
 	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-120fps-hdtc4-ffv1"
+	outpart="${inname}-120fps-hdtc2.3-ffv1"
 	outname="${outpart}.mkv"
 	outfile="$STAGE3DIR/$outname"
 	ffmpeg -n \
@@ -735,14 +754,14 @@ function hdtc4 {
 		-vf "fieldmatch,decimate,bwdif=mode=send_field:deint=interlaced" \
 		-r "$MAXFPS" \
 		-c:v ffv1 "$outfile"
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function hdtc4."
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function hdtc2.3."
 }
 
-function hdtc5 {
-	[ $DEBUG = 0 ] || echo "DEBUG: Entering function hdtc5."
+function hdtc3 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function hdtc3."
 	local infile="$1"
 	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-24fps-hdtc5-ffv1"
+	outpart="${inname}-24fps-hdtc3-ffv1"
 	outname="${outpart}.mkv"
 	outfile="$STAGE3DIR/$outname"
 		ffmpeg -n \
@@ -754,14 +773,14 @@ function hdtc5 {
 			-vf "fieldmatch=mode=pc,bwdif=mode=send_field:deint=interlaced" \
 			-r "$FILMFPS" \
 			-c:v ffv1 "$outfile"
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function hdtc5."
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function hdtc3."
 }
 
-function hdtc6 {
-	[ $DEBUG = 0 ] || echo "DEBUG: Entering function hdtc6."
+function hdtc3.1 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function hdtc3.1."
 	local infile="$1"
 	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-30fps-hdtc6-ffv1"
+	outpart="${inname}-30fps-hdtc3.1-ffv1"
 	outname="${outpart}.mkv"
 	outfile="$STAGE3DIR/$outname"
 		ffmpeg -n \
@@ -773,14 +792,14 @@ function hdtc6 {
 			-vf "fieldmatch=mode=pc,bwdif=mode=send_field:deint=interlaced" \
 			-r "$VIDFPS" \
 			-c:v ffv1 "$outfile"
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function hdtc6."
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function hdtc3.1."
 }
 
-function hdtc7 {
-	[ $DEBUG = 0 ] || echo "DEBUG: Entering function hdtc7."
+function hdtc3.2 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function hdtc3.2."
 	local infile="$1"
 	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-60fps-hdtc6-ffv1"
+	outpart="${inname}-60fps-hdtc3.2-ffv1"
 	outname="${outpart}.mkv"
 	outfile="$STAGE3DIR/$outname"
 		ffmpeg -n \
@@ -792,14 +811,14 @@ function hdtc7 {
 			-vf "fieldmatch=mode=pc,bwdif=mode=send_field:deint=interlaced" \
 			-r "$IVIDFPS" \
 			-c:v ffv1 "$outfile"
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function hdtc7."
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function hdtc3.2."
 }
 
-function hdtc8 {
-	[ $DEBUG = 0 ] || echo "DEBUG: Entering function hdtc8."
+function hdtc3.3 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function hdtc3.3."
 	local infile="$1"
 	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-120fps-hdtc8-ffv1"
+	outpart="${inname}-120fps-hdtc3.3-ffv1"
 	outname="${outpart}.mkv"
 	outfile="$STAGE3DIR/$outname"
 		ffmpeg -n \
@@ -811,16 +830,16 @@ function hdtc8 {
 			-vf "fieldmatch=mode=pc,bwdif=mode=send_field:deint=interlaced" \
 			-r "$MAXFPS" \
 			-c:v ffv1 "$outfile"
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function hdtc8."
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function hdtc3.3."
 }
 
-function hdtc9 {
-	[ $DEBUG = 0 ] || echo "DEBUG: Entering function hdtc9."
+function hdtc4 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function hdtc4."
 	local infile="$1"
 	if [ "$inframes" -le 24 ]; then
 		# If it is short, pass it through
 		inname="$(echo "$infile" |cut -d. -f1)"
-		outpart="${inname}-passthrough-hdtc9-ffv1"
+		outpart="${inname}-passthrough-hdtc4a-ffv1"
 		outname="${outpart}.mkv"
 		outfile="$STAGE3DIR/$outname"
 			ffmpeg -n \
@@ -832,7 +851,7 @@ function hdtc9 {
 				-c:v ffv1 "$outfile"
 	else
 		inname="$(echo "$infile" |cut -d. -f1)"
-		outpart="${inname}-120fps-hdtc9-ffv1"
+		outpart="${inname}-120fps-hdtc4b-ffv1"
 		outname="${outpart}.mkv"
 		outfile="$STAGE3DIR/$outname"
 			ffmpeg -n \
@@ -841,11 +860,11 @@ function hdtc9 {
 				-stats \
 				-i "$infile" \
 				-an -sn \
-				-vf "fieldmatch=mode=pc,bwdif=mode=send_field:deint=interlaced" \
+				-vf "fieldmatch" \
 				-r "$MAXFPS" \
 				-c:v ffv1 "$outfile"
 	fi
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function hdtc9."
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function hdtc4."
 }
 
 function hardtelecine {
@@ -855,9 +874,9 @@ function hardtelecine {
 	tryalt=0
 	filmframes=$((filmframes + inframes))
 	if [ "$stage" -eq 1 ]; then
-		methodlist=(hdtc1 hdtc2 hdtc3 hdtc4 hdtc5 hdtc6 hdtc7 hdtc8)
+		methodlist=(hdtc2 hdtc2.1 hdtc2.2 hdtc2.3 hdtc3 hdtc3.1 hdtc3.2 hdtc3.3)
 	else
-		methodlist=(hdtc0 hdtc1 hdtc2 hdtc3 hdtc4 hdtc5 hdtc6 hdtc7 hdtc8 hdtc9)
+		methodlist=(hdtc1 hdtc2 hdtc2.1 hdtc2.2 hdtc2.3 hdtc3 hdtc3.1 hdtc3.2 hdtc3.3 hdtc4)
 	fi
 	local submethod
 	for submethod in "${methodlist[@]}"; do
@@ -873,14 +892,17 @@ function hardtelecine {
 		if [ "$stage" = 1 ] && [ "$(echo "$pctdiff <= $ALLOWLOSS" |bc -l)" -eq 1 ]; then
 			break
 		fi
-		if [ "$tryalt" = 1 ] && [ "$submethod" != "hdtc9" ]; then
-			echo "Submethod $submethod produced a bad duration."
+		if [ "$tryalt" = 1 ] && [ "$stage" -eq 1 ] && [ "$submethod" != "hdtc3.3" ]; then
+			echo "Submethod $submethod produced a bad duration: $bestcddurs vs. $incddurs"
+		elif [ "$tryalt" = 1 ] && [ "$submethod" != "hdtc4" ]; then
+			echo "Submethod $submethod produced a bad duration: $bestcddurs vs. $incddurs"
 		elif [ "$tryalt" = 1 ]; then
 			echo "No method produced a good duration.  Using the best bad result: $bestcddurs vs. $incddurs"
-			echo -n ",$submethod" >>"$reportfile"
+			echo ",$incddurs,$bestcddurs,$submethod" >>"$reportfile"
 		else
 			echo "Submethod $submethod produced a good duration: $bestcddurs vs. $incddurs"
-			echo -n ",$submethod" >>"$reportfile"
+			echo ",$incddurs,$bestcddurs,$submethod" >>"$reportfile"
+			if [ -f /home/bill/dvdripprep/mtrack.txt ]; then echo "$submethod" >>/home/bill/dvdripprep/mtrack.txt; fi
 			break
 		fi
 	done
@@ -893,11 +915,11 @@ function hardtelecine {
 	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function hardtelecine."
 }
 
-function ntsci0 {
+function ntsci1 {
 	[ $DEBUG = 0 ] || echo "DEBUG: Entering function ntsci1."
 	local infile="$1"
 	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-matched-ntsci0-ffv1"
+	outpart="${inname}-matched-ntsci1-ffv1"
 	outname="${outpart}.mkv"
 	outfile="$STAGE3DIR/$outname"
 		ffmpeg -n \
@@ -909,25 +931,6 @@ function ntsci0 {
 			-vf "bwdif=mode=send_field" \
 			-r "$infrate" \
 			-c:v ffv1 "$outfile"
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function ntsci0."
-}
-
-function ntsci1 {
-	[ $DEBUG = 0 ] || echo "DEBUG: Entering function ntsci1."
-	local infile="$1"
-	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-30fps-ntsci1-ffv1"
-	outname="${outpart}.mkv"
-	outfile="$STAGE3DIR/$outname"
-		ffmpeg -n \
-			-hide_banner \
-			-v warning \
-			-stats \
-			-i "$infile" \
-			-an -sn \
-			-vf "bwdif=mode=send_frame" \
-			-r "$VIDFPS" \
-			-c:v ffv1 "$outfile"
 	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function ntsci1."
 }
 
@@ -935,7 +938,26 @@ function ntsci2 {
 	[ $DEBUG = 0 ] || echo "DEBUG: Entering function ntsci2."
 	local infile="$1"
 	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-60fps-ntsci2-ffv1"
+	outpart="${inname}-30fps-ntsci2-ffv1"
+	outname="${outpart}.mkv"
+	outfile="$STAGE3DIR/$outname"
+		ffmpeg -n \
+			-hide_banner \
+			-v warning \
+			-stats \
+			-i "$infile" \
+			-an -sn \
+			-vf "bwdif=mode=send_frame" \
+			-r "$VIDFPS" \
+			-c:v ffv1 "$outfile"
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function ntsci2."
+}
+
+function ntsci2.1 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function ntsci2.1."
+	local infile="$1"
+	inname="$(echo "$infile" |cut -d. -f1)"
+	outpart="${inname}-60fps-ntsci2.1-ffv1"
 	outname="${outpart}.mkv"
 	outfile="$STAGE3DIR/$outname"
 		ffmpeg -n \
@@ -947,14 +969,14 @@ function ntsci2 {
 			-vf "bwdif=mode=send_frame" \
 			-r "$IVIDFPS" \
 			-c:v ffv1 "$outfile"
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function ntsci2."
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function ntsci2.1."
 }
 
-function ntsci3 {
-	[ $DEBUG = 0 ] || echo "DEBUG: Entering function ntsci3."
+function ntsci2.2 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function ntsci2.2."
 	local infile="$1"
 	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-120fps-ntsci3-ffv1"
+	outpart="${inname}-120fps-ntsci2.2-ffv1"
 	outname="${outpart}.mkv"
 	outfile="$STAGE3DIR/$outname"
 		ffmpeg -n \
@@ -966,14 +988,14 @@ function ntsci3 {
 			-vf "bwdif=mode=send_frame" \
 			-r "$MAXFPS" \
 			-c:v ffv1 "$outfile"
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function ntsci3."
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function ntsci2.2."
 }
 
-function ntsci4 {
-	[ $DEBUG = 0 ] || echo "DEBUG: Entering function ntsci1."
+function ntsci3 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function ntsci3."
 	local infile="$1"
 	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-30fps-ntsci4-ffv1"
+	outpart="${inname}-30fps-ntsci3-ffv1"
 	outname="${outpart}.mkv"
 	outfile="$STAGE3DIR/$outname"
 		ffmpeg -n \
@@ -985,14 +1007,14 @@ function ntsci4 {
 			-vf "bwdif=mode=send_field" \
 			-r "$VIDFPS" \
 			-c:v ffv1 "$outfile"
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function ntsci4."
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function ntsci3."
 }
 
-function ntsci5 {
-	[ $DEBUG = 0 ] || echo "DEBUG: Entering function ntsci5."
+function ntsci3.1 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function ntsci3.1."
 	local infile="$1"
 	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-60fps-ntsci5-ffv1"
+	outpart="${inname}-60fps-ntsci3.1-ffv1"
 	outname="${outpart}.mkv"
 	outfile="$STAGE3DIR/$outname"
 		ffmpeg -n \
@@ -1004,14 +1026,14 @@ function ntsci5 {
 			-vf "bwdif=mode=send_field" \
 			-r "$IVIDFPS" \
 			-c:v ffv1 "$outfile"
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function ntsci5."
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function ntsci3.1."
 }
 
-function ntsci6 {
-	[ $DEBUG = 0 ] || echo "DEBUG: Entering function ntsci6."
+function ntsci3.2 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function ntsci3.2."
 	local infile="$1"
 	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-120fps-ntsci6-ffv1"
+	outpart="${inname}-120fps-ntsci3.2-ffv1"
 	outname="${outpart}.mkv"
 	outfile="$STAGE3DIR/$outname"
 		ffmpeg -n \
@@ -1023,7 +1045,7 @@ function ntsci6 {
 			-vf "bwdif=mode=send_field" \
 			-r "$MAXFPS" \
 			-c:v ffv1 "$outfile"
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function ntsci6."
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function ntsci3.2."
 }
 
 function ntscinterlaced {
@@ -1033,9 +1055,9 @@ function ntscinterlaced {
 	tryalt=0
 	vidframes=$((vidframes + inframes))
 	if [ "$stage" -eq 1 ]; then
-		methodlist=(ntsci1 ntsci2 ntsci3 ntsci4 ntsci5 ntsci6)
+		methodlist=(ntsci2 ntsci2.1 ntsci2.2 ntsci3 ntsci3.1 ntsci3.2)
 	else
-		methodlist=(ntsci0 ntsci1 ntsci2 ntsci3 ntsci4 ntsci5 ntsci6)
+		methodlist=(ntsci1 ntsci2 ntsci2.1 ntsci2.2 ntsci3 ntsci3.1 ntsci3.2)
 	fi
 	local submethod
 	for submethod in "${methodlist[@]}"; do
@@ -1051,14 +1073,15 @@ function ntscinterlaced {
 		if [ "$stage" = 1 ] && [ "$(echo "$pctdiff <= $ALLOWLOSS" |bc -l)" -eq 1 ]; then
 			break
 		fi
-		if [ "$tryalt" = 1 ] && [ "$submethod" != "ntsci6" ]; then
-			echo "Submethod $submethod produced a bad duration."
+		if [ "$tryalt" = 1 ] && [ "$submethod" != "ntsci3.2" ]; then
+			echo "Submethod $submethod produced a bad duration: $bestcddurs vs. $incddurs"
 		elif [ "$tryalt" = 1 ]; then
 			echo "No method produced a good duration.  Using the best bad result: $bestcddurs vs. $incddurs"
-			echo -n ",$submethod" >>"$reportfile"
+			echo ",$incddurs,$bestcddurs,$submethod" >>"$reportfile"
 		else
 			echo "Submethod $submethod produced a good duration: $bestcddurs vs. $incddurs"
-			echo -n ",$submethod" >>"$reportfile"
+			echo ",$incddurs,$bestcddurs,$submethod" >>"$reportfile"
+			if [ -f /home/bill/dvdripprep/mtrack.txt ]; then echo "$submethod" >>/home/bill/dvdripprep/mtrack.txt; fi
 			break
 		fi
 	done
@@ -1071,78 +1094,148 @@ function ntscinterlaced {
 	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function ntscinterlaced."
 }
 
+function palint2 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function palint2."
+	local infile="$1"
+	inname="$(echo "$infile" |cut -d. -f1)"
+	outpart="${inname}-24fps_pal2ntsc-palint2-ffv1.mkv"
+	finfile="$OUTDIR/$outpart"
+	ffmpeg -n \
+		-hide_banner \
+		-v warning \
+		-stats \
+		-r "$FILMFPS" \
+		-i "$infile" \
+		-an -sn \
+		-vf "bwdif=mode=send_frame" \
+		-r "$FILMFPS" \
+		-c:v ffv1 "$finfile"
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function palint2."
+}
+
+function palint2.1 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function palint2.1."
+	local infile="$1"
+	inname="$(echo "$infile" |cut -d. -f1)"
+	outpart="${inname}-48fps_pal2ntsc-palint2.1-ffv1.mkv"
+	finfile="$OUTDIR/$outpart"
+	ffmpeg -n \
+		-hide_banner \
+		-v warning \
+		-stats \
+		-r "$FILMFPS" \
+		-i "$infile" \
+		-an -sn \
+		-vf "bwdif=mode=send_field" \
+		-r "$IPALCONVFPS" \
+		-c:v ffv1 "$finfile"
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function palint2.1."
+}
+
+function palint1 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function palint1."
+	local infile="$1"
+	inname="$(echo "$infile" |cut -d. -f1)"
+	outpart="${inname}-25fps_pal-palint1-ffv1.mkv"
+	finfile="$OUTDIR/$outpart"
+	ffmpeg -n \
+		-hide_banner \
+		-v warning \
+		-stats \
+		-i "$infile" \
+		-an -sn \
+		-vf "bwdif=mode=send_frame" \
+		-r "$PALFPS" \
+		-c:v ffv1 "$finfile"
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function palint1."
+}
+
+function palint1.1 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function palint1."
+	local infile="$1"
+	inname="$(echo "$infile" |cut -d. -f1)"
+	outpart="${inname}-50fps_pal-palint1.1-ffv1.mkv"
+	finfile="$OUTDIR/$outpart"
+	ffmpeg -n \
+		-hide_banner \
+		-v warning \
+		-stats \
+		-i "$infile" \
+		-an -sn \
+		-vf "bwdif=mode=send_field" \
+		-r "$IPALFPS" \
+		-c:v ffv1 "$finfile"
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function palint1."
+}
+
 function palinterlaced {
 	[ $DEBUG = 0 ] || echo "DEBUG: Entering function palinterlaced."
 	infile="$1"
 	inname="$(echo "$infile" |cut -d. -f1)"
 	if [ $CONVPAL = 1 ]; then
-		echo "Converting 25FPS PAL interlaced video to 24 and 48FPS..." |tee -a "$logfile";echo
-		echo "Outputting tempo corrected audio..."
-		outaname="${inname}-pal2ntsc-deint-audio-vorbis.mkv"
-		outafile="$OUTDIR/$outaname"
-		ffmpeg -n \
-			-hide_banner \
-			-v warning \
-			-stats \
-			-i "$file" \
-			-vn -sn \
-			-af "atempo=0.959040959040959" \
-			-c:a libvorbis "$outafile"
-		[[ -v SUDO_USER ]] && chown "$SUDO_USER" "$outafile"
+		echo;echo "Converting 25FPS PAL interlaced video to 24 and 48FPS..."
 		echo "Converting video with blended fields..."
-		outname="${inname}-24fps_pal2ntsc-deint-ffv1.mkv"
-		outfile="$OUTDIR/$outname"
-		ffmpeg -n \
-			-hide_banner \
-			-v warning \
-			-stats \
-			-r "$FILMFPS" \
-			-i "$file" \
-			-an -sn \
-			-vf "bwdif=mode=send_frame" \
-			-r "$FILMFPS" \
-			-c:v ffv1 "$outfile"
-		[[ -v SUDO_USER ]] && chown "$SUDO_USER" "$outfile"
-		mergename="${inname}-24fps-merged.mkv"
-		mergefile="$OUTDIR/$mergename"
-		echo "Merging audio and video tracks..." |tee -a "$logfile"
-		mkvmerge -o "$mergefile" "$outfile" "$outafile"
-		[[ -v SUDO_USER ]] && chown "$SUDO_USER" "$mergefile"
+		palint2 "$infile"
+		checkduration "$rundir/$orgfile" "$finfile"
+		echo "Finalized time difference: In: $incddurs Out: $outcddurs."
+		matchtracks "$orgfile" "$finfile"
+		mergeinout "$rundir/$orgfile" "$finfile"
 		echo "Converting video with intact fields..."
-		outname="${inname}-48fps_pal2ntsc-deint-ffv1.mkv"
-		outfile="$OUTDIR/$outname"
-		ffmpeg -n \
-			-hide_banner \
-			-v warning \
-			-stats \
-			-r "$FILMFPS" \
-			-i "$file" \
-			-an -sn \
-			-vf "bwdif=mode=send_field" \
-			-r "$IPALCONVFPS" \
-			-c:v ffv1 "$outfile"
-		[[ -v SUDO_USER ]] && chown "$SUDO_USER" "$outfile"
-		mergename="${inname}-48fps-merged.mkv"
-		mergefile="$OUTDIR/$mergename"
-		echo "Merging audio and video tracks..." |tee -a "$logfile"
-		mkvmerge -o "$mergefile" "$outfile" "$outafile"
-		[[ -v SUDO_USER ]] && chown "$SUDO_USER" "$mergefile"
+		palint2.1 "$infile"
+		checkduration "$rundir/$orgfile" "$finfile"
+		echo "Finalized time difference: In: $incddurs Out: $outcddurs."
+		matchtracks "$orgfile" "$finfile"
+		mergeinout "$rundir/$orgfile" "$finfile"
 	else
-		echo "Outputting PAL interlaced video at 50FPS..." |tee -a "$logfile";echo
-		outname="${inname}-50fps_pal-deint-ffv1.mkv"
-		outfile="$OUTDIR/$outname"
-		ffmpeg -n \
-			-hide_banner \
-			-v warning \
-			-stats \
-			-i "$file" \
-			-an -sn \
-			-vf "bwdif=mode=send_field" \
-			-r "$IPALFPS" \
-			-c:v ffv1 "$outfile"
-		[[ -v SUDO_USER ]] && chown "$SUDO_USER" "$outfile"
+		echo "Converting 25FPS PAL interlaced video to 25 and 50FPS..."
+		echo "Converting video with blended fields..."
+		palint1 "$infile"
+		checkduration "$rundir/$orgfile" "$finfile"
+		echo "Finalized time difference: In: $incddurs Out: $outcddurs."
+		matchtracks "$orgfile" "$finfile"
+		mergeinout "$rundir/$orgfile" "$finfile"
+		echo "Converting video with intact fields..."
+		palint1.1 "$infile"
+		checkduration "$rundir/$orgfile" "$finfile"
+		echo "Finalized time difference: In: $incddurs Out: $outcddurs."
+		matchtracks "$orgfile" "$finfile"
+		mergeinout "$rundir/$orgfile" "$finfile"
 	fi
 	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function palinterlaced."
+}
+
+function palprog2 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function palprog2."
+	local infile="$1"
+	inname="$(echo "$infile" |cut -d. -f1)"
+	outpart="${inname}-24fps_pal2ntsc-palprog2-ffv1.mkv"
+	finfile="$OUTDIR/$outpart"
+	ffmpeg -n \
+		-hide_banner \
+		-v warning \
+		-stats \
+		-r "$FILMFPS" \
+		-i "$infile" \
+		-an -sn \
+		-c:v ffv1 "$finfile"
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function palprog2."
+}
+
+function palprog1 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function palprog1."
+	local infile="$1"
+	inname="$(echo "$infile" |cut -d. -f1)"
+	outpart="${inname}-25fps_pal-palprog1-ffv1.mkv"
+	finfile="$OUTDIR/$outpart"
+	ffmpeg -n \
+		-hide_banner \
+		-v warning \
+		-stats \
+		-i "$infile" \
+		-an -sn \
+		-r "$PALFPS" \
+		-c:v ffv1 "$finfile"
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function palprog1."
 }
 
 function palprogressive {
@@ -1150,50 +1243,20 @@ function palprogressive {
 	infile="$1"
 	inname="$(echo "$infile" |cut -d. -f1)"
 	if [ $CONVPAL = 1 ]; then
-		echo "Converting 25FPS PAL progressive video to 24FPS..." |tee -a "$logfile";echo
-		echo "Outputting tempo corrected audio..."
-		outaname="${inname}-24fps_pal2ntsc-prog-audio-vorbis.mkv"
-		outafile="$OUTDIR/$outaname"
-		ffmpeg -n \
-			-hide_banner \
-			-v warning \
-			-stats \
-			-i "$file" \
-			-vn -sn \
-			-af "atempo=0.959040959040959" \
-			-c:a libvorbis "$outafile"
-		[[ -v SUDO_USER ]] && chown "$SUDO_USER" "$outafile"
+		echo;echo "Converting 25FPS PAL progressive video to 24FPS..."
 		echo "Converting video..."
-		outname="${inname}-24fps_pal2ntsc-prog-ffv1.mkv"
-		outfile="$OUTDIR/$outname"
-		ffmpeg -n \
-			-hide_banner \
-			-v warning \
-			-stats \
-			-r "$FILMFPS" \
-			-i "$file" \
-			-an -sn \
-			-r "$FILMFPS" \
-			-c:v ffv1 "$outfile"
-		[[ -v SUDO_USER ]] && chown "$SUDO_USER" "$outfile"
-		mergename="${inname}-merged.mkv"
-		mergefile="$OUTDIR/$mergename"
-		echo "Merging audio and video tracks..." |tee -a "$logfile"
-		mkvmerge -o "$mergefile" "$outfile" "$outafile"
-		[[ -v SUDO_USER ]] && chown "$SUDO_USER" "$mergefile"
+		palprog2 "$infile"
+		checkduration "$rundir/$orgfile" "$finfile"
+		echo "Finalized time difference: In: $incddurs Out: $outcddurs."
+		matchtracks "$orgfile" "$finfile"
+		mergeinout "$rundir/$orgfile" "$finfile"
 	else
-		echo "Converting 25FPS PAL interlaced video at 25FPS..." |tee -a "$logfile";echo
-		outname="${inname}-25fps_pal-prog-ffv1.mkv"
-		outfile="$OUTDIR/$outname"
-		ffmpeg -n \
-			-hide_banner \
-			-v warning \
-			-stats \
-			-i "$file" \
-			-an -sn \
-			-r "$PALFPS" \
-			-c:v ffv1 "$outfile"
-		[[ -v SUDO_USER ]] && chown "$SUDO_USER" "$outfile"
+		echo "Converting 25FPS PAL interlaced video at 25FPS..."
+		palprog1 "$infile"
+		checkduration "$rundir/$orgfile" "$finfile"
+		echo "Finalized time difference: In: $incddurs Out: $outcddurs."
+		matchtracks "$orgfile" "$finfile"
+		mergeinout "$rundir/$orgfile" "$finfile"
 	fi
 	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function palprogressive."
 }
@@ -1212,16 +1275,17 @@ function passthrough {
 		-i "$infile" \
 		-an -sn \
 		-c:v ffv1 "$outfile"
-		echo -n ",passthrough" >>"$reportfile"
+		echo ",-,-,passthrough" >>"$reportfile"
+		if [ -f /home/bill/dvdripprep/mtrack.txt ]; then echo "passthrough" >>/home/bill/dvdripprep/mtrack.txt; fi
 	bestfile="$outfile"
 	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function passthrough."
 }
 
-function sdtc0 {
-	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdtc0."
+function sdtc1 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdtc1."
 	local infile="$1"
 	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-matched-sdtc0-ffv1"
+	outpart="${inname}-matched-sdtc1-ffv1"
 	outname="${outpart}.mkv"
 	outfile="$STAGE3DIR/$outname"
 	ffmpeg -n \
@@ -1232,14 +1296,14 @@ function sdtc0 {
 		-an -sn \
 		-r "$infrate" \
 		-c:v ffv1 "$outfile"
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdtc0."
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdtc1."
 }
 
-function sdtc1 {
-	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdtc1."
+function sdtc2 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdtc2."
 	local infile="$1"
 	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-24fps-sdtc1-ffv1"
+	outpart="${inname}-24fps-sdtc2-ffv1"
 	outname="${outpart}.mkv"
 	outfile="$STAGE3DIR/$outname"
 	ffmpeg -n \
@@ -1250,14 +1314,68 @@ function sdtc1 {
 		-an -sn \
 		-r "$FILMFPS" \
 		-c:v ffv1 "$outfile"
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdtc1."
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdtc2."
 }
 
-function sdtc2 {
-	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdtc2."
+function sdtc2.1 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdtc2.1."
 	local infile="$1"
 	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-120fps-sdtc2-ffv1"
+	outpart="${inname}-30fps-sdtc2.1-ffv1"
+	outname="${outpart}.mkv"
+	outfile="$STAGE3DIR/$outname"
+	ffmpeg -n \
+		-hide_banner \
+		-v warning \
+		-stats \
+		-i "$infile" \
+		-an -sn \
+		-r "$VIDFPS" \
+		-c:v ffv1 "$outfile"
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdtc2.1."
+}
+
+function sdtc2.2 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdtc2.2."
+	local infile="$1"
+	inname="$(echo "$infile" |cut -d. -f1)"
+	outpart="${inname}-48fps-sdtc2.2-ffv1"
+	outname="${outpart}.mkv"
+	outfile="$STAGE3DIR/$outname"
+	ffmpeg -n \
+		-hide_banner \
+		-v warning \
+		-stats \
+		-i "$infile" \
+		-an -sn \
+		-r "$FDBLFPS" \
+		-c:v ffv1 "$outfile"
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdtc2.2."
+}
+
+function sdtc2.3 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdtc2.3."
+	local infile="$1"
+	inname="$(echo "$infile" |cut -d. -f1)"
+	outpart="${inname}-60fps-sdtc2.3-ffv1"
+	outname="${outpart}.mkv"
+	outfile="$STAGE3DIR/$outname"
+	ffmpeg -n \
+		-hide_banner \
+		-v warning \
+		-stats \
+		-i "$infile" \
+		-an -sn \
+		-r "$IVIDFPS" \
+		-c:v ffv1 "$outfile"
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdtc2.3."
+}
+
+function sdtc2.4 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdtc2.4."
+	local infile="$1"
+	inname="$(echo "$infile" |cut -d. -f1)"
+	outpart="${inname}-120fps-sdtc2.4-ffv1"
 	outname="${outpart}.mkv"
 	outfile="$STAGE3DIR/$outname"
 	ffmpeg -n \
@@ -1268,7 +1386,7 @@ function sdtc2 {
 		-an -sn \
 		-r "$MAXFPS" \
 		-c:v ffv1 "$outfile"
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdtc2."
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdtc2.4."
 }
 
 function sdtc3 {
@@ -1290,11 +1408,49 @@ function sdtc3 {
 	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdtc3."
 }
 
-function sdtc4 {
-	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdtc4."
+function sdtc3.1 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdtc3.1."
 	local infile="$1"
 	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-120fps-sdtc4-ffv1"
+	outpart="${inname}-30fps-sdtc3.1-ffv1"
+	outname="${outpart}.mkv"
+	outfile="$STAGE3DIR/$outname"
+		ffmpeg -n \
+			-hide_banner \
+			-v warning \
+			-stats \
+			-i "$infile" \
+			-an -sn \
+			-vf "fieldmatch,bwdif=mode=send_frame:deint=interlaced" \
+			-r "$VIDFPS" \
+			-c:v ffv1 "$outfile"
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdtc3.1."
+}
+
+function sdtc3.2 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdtc3.2."
+	local infile="$1"
+	inname="$(echo "$infile" |cut -d. -f1)"
+	outpart="${inname}-60fps-sdtc3.2-ffv1"
+	outname="${outpart}.mkv"
+	outfile="$STAGE3DIR/$outname"
+		ffmpeg -n \
+			-hide_banner \
+			-v warning \
+			-stats \
+			-i "$infile" \
+			-an -sn \
+			-vf "fieldmatch,bwdif=mode=send_frame:deint=interlaced" \
+			-r "$IVIDFPS" \
+			-c:v ffv1 "$outfile"
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdtc3.2."
+}
+
+function sdtc3.3 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdtc3.3."
+	local infile="$1"
+	inname="$(echo "$infile" |cut -d. -f1)"
+	outpart="${inname}-120fps-sdtc3.3-ffv1"
 	outname="${outpart}.mkv"
 	outfile="$STAGE3DIR/$outname"
 		ffmpeg -n \
@@ -1306,14 +1462,157 @@ function sdtc4 {
 			-vf "fieldmatch,bwdif=mode=send_frame:deint=interlaced" \
 			-r "$MAXFPS" \
 			-c:v ffv1 "$outfile"
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdtc3.3."
+}
+
+function sdtc4 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdtc4."
+	local infile="$1"
+	inname="$(echo "$infile" |cut -d. -f1)"
+	outpart="${inname}-24fps-sdtc4-ffv1"
+	outname="${outpart}.mkv"
+	outfile="$STAGE3DIR/$outname"
+		ffmpeg -n \
+			-hide_banner \
+			-v warning \
+			-stats \
+			-i "$infile" \
+			-an -sn \
+			-vf "fieldmatch,bwdif=mode=send_field:deint=interlaced" \
+			-r "$FILMFPS" \
+			-c:v ffv1 "$outfile"
 	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdtc4."
+}
+
+function sdtc4.1 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdtc4.1."
+	local infile="$1"
+	inname="$(echo "$infile" |cut -d. -f1)"
+	outpart="${inname}-30fps-sdtc4.1-ffv1"
+	outname="${outpart}.mkv"
+	outfile="$STAGE3DIR/$outname"
+		ffmpeg -n \
+			-hide_banner \
+			-v warning \
+			-stats \
+			-i "$infile" \
+			-an -sn \
+			-vf "fieldmatch,bwdif=mode=send_field:deint=interlaced" \
+			-r "$VIDFPS" \
+			-c:v ffv1 "$outfile"
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdtc4.1."
+}
+
+function sdtc4.2 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdtc4.2."
+	local infile="$1"
+	inname="$(echo "$infile" |cut -d. -f1)"
+	outpart="${inname}-60fps-sdtc4.2-ffv1"
+	outname="${outpart}.mkv"
+	outfile="$STAGE3DIR/$outname"
+		ffmpeg -n \
+			-hide_banner \
+			-v warning \
+			-stats \
+			-i "$infile" \
+			-an -sn \
+			-vf "fieldmatch,bwdif=mode=send_field:deint=interlaced" \
+			-r "$IVIDFPS" \
+			-c:v ffv1 "$outfile"
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdtc4.2."
+}
+
+function sdtc4.3 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdtc4.3."
+	local infile="$1"
+	inname="$(echo "$infile" |cut -d. -f1)"
+	outpart="${inname}-120fps-sdtc4.3-ffv1"
+	outname="${outpart}.mkv"
+	outfile="$STAGE3DIR/$outname"
+		ffmpeg -n \
+			-hide_banner \
+			-v warning \
+			-stats \
+			-i "$infile" \
+			-an -sn \
+			-vf "fieldmatch,bwdif=mode=send_field:deint=interlaced" \
+			-r "$MAXFPS" \
+			-c:v ffv1 "$outfile"
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdtc4.3."
 }
 
 function sdtc5 {
 	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdtc5."
 	local infile="$1"
 	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-120fps-sdtc5-ffv1"
+	outpart="${inname}-24fps-sdtc5-ffv1"
+	outname="${outpart}.mkv"
+	outfile="$STAGE3DIR/$outname"
+	ffmpeg -n \
+		-hide_banner \
+		-v warning \
+		-stats \
+		-i "$infile" \
+		-an -sn \
+		-vf "fieldmatch,bwdif=mode=send_field:deint=interlaced,fps=120" \
+		-r "$FILMFPS" \
+		-c:v ffv1 "$outfile"
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdtc5."
+}
+
+function softtelecine {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function softtelecine."
+	local infile="$1"
+	bestdiff=100
+	tryalt=0
+	filmframes=$((filmframes + inframes))
+	if [ "$stage" -eq 1 ]; then
+		methodlist=(sdtc2 sdtc2.1 sdtc2.2 sdtc2.3 sdtc2.4 sdtc3 sdtc3.1 sdtc3.2 sdtc3.3 sdtc4 sdtc4.1 sdtc4.2 sdtc4.3)
+	else
+		methodlist=(sdtc1 sdtc2 sdtc2.1 sdtc2.2 sdtc2.3 sdtc2.4 sdtc3 sdtc3.1 sdtc3.2 sdtc3.3 sdtc4 sdtc4.1 sdtc4.2 sdtc4.3 sdtc5)
+	fi
+	local submethod
+	for submethod in "${methodlist[@]}"; do
+		echo "Trying submethod $submethod..."
+		"$submethod" "$infile"
+		checkduration "$infile" "$outfile"
+		if [ "$(echo "$pctdiff < $bestdiff" |bc -l)" -eq 1 ]; then
+			bestfile="$outfile"
+			bestdiff="$pctdiff"
+			bestcddurs="$outcddurs"
+			showdiff="$(printf "%.3f\n" "$rtdiff")"
+		fi
+		if [ "$stage" = 1 ] && [ "$(echo "$pctdiff <= $ALLOWLOSS" |bc -l)" -eq 1 ]; then
+			break
+		fi
+		if [ "$tryalt" = 1 ] && [ "$stage" -eq 1 ] && [ "$submethod" != "sdtc4.3" ]; then
+			echo "Submethod $submethod produced a bad duration: $bestcddurs vs. $incddurs"
+		elif [ "$tryalt" = 1 ] && [ "$submethod" != "sdtc5" ]; then
+			echo "Submethod $submethod produced a bad duration: $bestcddurs vs. $incddurs"
+		elif [ "$tryalt" = 1 ]; then
+			echo "No method produced a good duration.  Using the best bad result: $bestcddurs vs. $incddurs"
+			echo ",$incddurs,$bestcddurs,$submethod" >>"$reportfile"
+		else
+			echo "Submethod $submethod produced a good duration: $bestcddurs vs. $incddurs"
+			echo ",$incddurs,$bestcddurs,$submethod" >>"$reportfile"
+			if [ -f /home/bill/dvdripprep/mtrack.txt ]; then echo "$submethod" >>/home/bill/dvdripprep/mtrack.txt; fi
+			break
+		fi
+	done
+	if [ "$(echo "$bestdiff > 0" |bc -l)" -eq 1 ]; then
+		rename="$(echo "$bestfile" |cut -d. -f1)"
+		refile="${rename}-dt${showdiff}.mkv"
+		mv "$bestfile" "$refile"
+		bestfile="$refile"
+	fi
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function softtelecine."
+}
+
+function sdi1 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdi1."
+	local infile="$1"
+	inname="$(echo "$infile" |cut -d. -f1)"
+	outpart="${inname}-matched-sdi1-ffv1"
 	outname="${outpart}.mkv"
 	outfile="$STAGE3DIR/$outname"
 		ffmpeg -n \
@@ -1323,26 +1622,198 @@ function sdtc5 {
 			-i "$infile" \
 			-an -sn \
 			-vf "fieldmatch=mode=pc,bwdif=mode=send_field:deint=interlaced" \
-			-r "$MAXFPS" \
+			-r "$infrate" \
 			-c:v ffv1 "$outfile"
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdtc5."
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdi1."
 }
 
-function sdtc6 {
-	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdtc0."
+function sdi2 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdi2."
 	local infile="$1"
 	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-passthrough-sdtc6-ffv1"
+	outpart="${inname}-24fps-sdi2-ffv1"
 	outname="${outpart}.mkv"
 	outfile="$STAGE3DIR/$outname"
-	ffmpeg -n \
-		-hide_banner \
-		-v warning \
-		-stats \
-		-i "$infile" \
-		-an -sn \
-		-c:v ffv1 "$outfile"
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdtc6."
+		ffmpeg -n \
+			-hide_banner \
+			-v warning \
+			-stats \
+			-i "$infile" \
+			-an -sn \
+			-vf "fieldmatch=mode=pc,bwdif=mode=send_field:deint=interlaced" \
+			-r "$FILMFPS" \
+			-c:v ffv1 "$outfile"
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdi2."
+}
+
+function sdi2.1 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdi2.1."
+	local infile="$1"
+	inname="$(echo "$infile" |cut -d. -f1)"
+	outpart="${inname}-30fps-sdi2.1-ffv1"
+	outname="${outpart}.mkv"
+	outfile="$STAGE3DIR/$outname"
+		ffmpeg -n \
+			-hide_banner \
+			-v warning \
+			-stats \
+			-i "$infile" \
+			-an -sn \
+			-vf "fieldmatch,bwdif=mode=send_field:deint=interlaced" \
+			-r "$VIDFPS" \
+			-c:v ffv1 "$outfile"
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdi2.1."
+}
+
+function sdi2.2 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdi2.2."
+	local infile="$1"
+	inname="$(echo "$infile" |cut -d. -f1)"
+	outpart="${inname}-48fps-sdi2.2-ffv1"
+	outname="${outpart}.mkv"
+	outfile="$STAGE3DIR/$outname"
+		ffmpeg -n \
+			-hide_banner \
+			-v warning \
+			-stats \
+			-i "$infile" \
+			-an -sn \
+			-vf "fieldmatch=mode=pc,bwdif=mode=send_field:deint=interlaced" \
+			-r "$FDBLFPS" \
+			-c:v ffv1 "$outfile"
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdi2.2."
+}
+
+function sdi2.3 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdtc2.3."
+	local infile="$1"
+	inname="$(echo "$infile" |cut -d. -f1)"
+	outpart="${inname}-60fps-sdi2.3-ffv1"
+	outname="${outpart}.mkv"
+	outfile="$STAGE3DIR/$outname"
+		ffmpeg -n \
+			-hide_banner \
+			-v warning \
+			-stats \
+			-i "$infile" \
+			-an -sn \
+			-vf "fieldmatch,bwdif=mode=send_field:deint=interlaced" \
+			-r "$IVIDFPS" \
+			-c:v ffv1 "$outfile"
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdi2.3."
+}
+
+function sdi2.4 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdtc2.4."
+	local infile="$1"
+	inname="$(echo "$infile" |cut -d. -f1)"
+	outpart="${inname}-120fps-sdi2.4-ffv1"
+	outname="${outpart}.mkv"
+	outfile="$STAGE3DIR/$outname"
+		ffmpeg -n \
+			-hide_banner \
+			-v warning \
+			-stats \
+			-i "$infile" \
+			-an -sn \
+			-vf "fieldmatch,bwdif=mode=send_field:deint=interlaced" \
+			-r "$MAXFPS" \
+			-c:v ffv1 "$outfile"
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdi2.4."
+}
+
+function sdi3 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdi3."
+	local infile="$1"
+	inname="$(echo "$infile" |cut -d. -f1)"
+	outpart="${inname}-24fps-sdi3-ffv1"
+	outname="${outpart}.mkv"
+	outfile="$STAGE3DIR/$outname"
+		ffmpeg -n \
+			-hide_banner \
+			-v warning \
+			-stats \
+			-i "$infile" \
+			-an -sn \
+			-vf "fieldmatch=mode=pc,bwdif=mode=send_field:deint=all" \
+			-r "$FILMFPS" \
+			-c:v ffv1 "$outfile"
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdi3."
+}
+
+function sdi3.1 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdi3.1."
+	local infile="$1"
+	inname="$(echo "$infile" |cut -d. -f1)"
+	outpart="${inname}-30fps-sdi3.1-ffv1"
+	outname="${outpart}.mkv"
+	outfile="$STAGE3DIR/$outname"
+		ffmpeg -n \
+			-hide_banner \
+			-v warning \
+			-stats \
+			-i "$infile" \
+			-an -sn \
+			-vf "fieldmatch=mode=pc,bwdif=mode=send_field:deint=all" \
+			-r "$VIDFPS" \
+			-c:v ffv1 "$outfile"
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdi3.1."
+}
+
+function sdi3.2 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdi3.2."
+	local infile="$1"
+	inname="$(echo "$infile" |cut -d. -f1)"
+	outpart="${inname}-60fps-sdi3.2-ffv1"
+	outname="${outpart}.mkv"
+	outfile="$STAGE3DIR/$outname"
+		ffmpeg -n \
+			-hide_banner \
+			-v warning \
+			-stats \
+			-i "$infile" \
+			-an -sn \
+			-vf "fieldmatch=mode=pc,bwdif=mode=send_field:deint=all" \
+			-r "$IVIDFPS" \
+			-c:v ffv1 "$outfile"
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdi3.2."
+}
+
+function sdi3.3 {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdi3.3."
+	local infile="$1"
+	inname="$(echo "$infile" |cut -d. -f1)"
+	outpart="${inname}-120fps-sdi3.3-ffv1"
+	outname="${outpart}.mkv"
+	outfile="$STAGE3DIR/$outname"
+		ffmpeg -n \
+			-hide_banner \
+			-v warning \
+			-stats \
+			-i "$infile" \
+			-an -sn \
+			-vf "fieldmatch=mode=pc,bwdif=mode=send_field:deint=all" \
+			-r "$MAXFPS" \
+			-c:v ffv1 "$outfile"
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdi3.3."
+}
+
+function sdi4 {
+# If all else fails, pass it through unchanged
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdi4."
+	local infile="$1"
+	inname="$(echo "$infile" |cut -d. -f1)"
+	outpart="${inname}-pass-sdi4-ffv1"
+	outname="${outpart}.mkv"
+	outfile="$STAGE3DIR/$outname"
+		ffmpeg -n \
+			-hide_banner \
+			-v warning \
+			-stats \
+			-i "$infile" \
+			-an -sn \
+			-c:v ffv1 "$outfile"
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdi4."
 }
 
 function softinterlaced {
@@ -1351,11 +1822,7 @@ function softinterlaced {
 	bestdiff=100
 	tryalt=0
 	filmframes=$((filmframes + inframes))
-	if [ "$stage" -eq 1 ]; then
-		methodlist=(sdi1 sdi2 sdi3 sdi4)
-	else
-		methodlist=(sdi0 sdi1 sdi2 sdi3 sdi4)
-	fi
+	methodlist=(sdi1 sdi2 sdi2.1 sdi2.2 sdi2.3 sdi2.4 sdi3 sdi3.1 sdi3.2 sdi3.3 sdi4)
 	local submethod
 	for submethod in "${methodlist[@]}"; do
 		echo "Trying submethod $submethod..."
@@ -1371,13 +1838,14 @@ function softinterlaced {
 			break
 		fi
 		if [ "$tryalt" = 1 ] && [ "$submethod" != "sdi4" ]; then
-			echo "Submethod $submethod produced a bad duration."
+			echo "Submethod $submethod produced a bad duration: $bestcddurs vs. $incddurs"
 		elif [ "$tryalt" = 1 ]; then
 			echo "No method produced a good duration.  Using the best bad result: $bestcddurs vs. $incddurs"
-			echo -n ",$submethod" >>"$reportfile"
+			echo ",$incddurs,$bestcddurs,$submethod" >>"$reportfile"
 		else
 			echo "Submethod $submethod produced a good duration: $bestcddurs vs. $incddurs"
-			echo -n ",$submethod" >>"$reportfile"
+			echo ",$incddurs,$bestcddurs,$submethod" >>"$reportfile"
+			if [ -f /home/bill/dvdripprep/mtrack.txt ]; then echo "$submethod" >>/home/bill/dvdripprep/mtrack.txt; fi
 			break
 		fi
 	done
@@ -1388,146 +1856,6 @@ function softinterlaced {
 		bestfile="$refile"
 	fi
 	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function softinterlaced."
-}
-
-function sdi0 {
-	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdi0."
-	local infile="$1"
-	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-matched-sdi0-ffv1"
-	outname="${outpart}.mkv"
-	outfile="$STAGE3DIR/$outname"
-		ffmpeg -n \
-			-hide_banner \
-			-v warning \
-			-stats \
-			-i "$infile" \
-			-an -sn \
-			-vf "fieldmatch=mode=pc,bwdif=mode=send_field:deint=interlaced" \
-			-r "$infrate" \
-			-c:v ffv1 "$outfile"
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdi0."
-}
-
-function sdi1 {
-	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdi1."
-	local infile="$1"
-	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-24fps-sdi1-ffv1"
-	outname="${outpart}.mkv"
-	outfile="$STAGE3DIR/$outname"
-		ffmpeg -n \
-			-hide_banner \
-			-v warning \
-			-stats \
-			-i "$infile" \
-			-an -sn \
-			-vf "fieldmatch=mode=pc,bwdif=mode=send_field:deint=interlaced" \
-			-r "$FILMFPS" \
-			-c:v ffv1 "$outfile"
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdi1."
-}
-
-function sdi2 {
-	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdi2."
-	local infile="$1"
-	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-30fps-sdi2-ffv1"
-	outname="${outpart}.mkv"
-	outfile="$STAGE3DIR/$outname"
-		ffmpeg -n \
-			-hide_banner \
-			-v warning \
-			-stats \
-			-i "$infile" \
-			-an -sn \
-			-vf "fieldmatch,bwdif=mode=send_field:deint=interlaced" \
-			-r "$VIDFPS" \
-			-c:v ffv1 "$outfile"
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdi2."
-}
-
-function sdi3 {
-	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdtc8."
-	local infile="$1"
-	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-60fps-sdi3-ffv1"
-	outname="${outpart}.mkv"
-	outfile="$STAGE3DIR/$outname"
-		ffmpeg -n \
-			-hide_banner \
-			-v warning \
-			-stats \
-			-i "$infile" \
-			-an -sn \
-			-vf "fieldmatch,bwdif=mode=send_field:deint=interlaced" \
-			-r "$IVIDFPS" \
-			-c:v ffv1 "$outfile"
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdi3."
-}
-
-function sdi4 {
-	[ $DEBUG = 0 ] || echo "DEBUG: Entering function sdtc8."
-	local infile="$1"
-	inname="$(echo "$infile" |cut -d. -f1)"
-	outpart="${inname}-120fps-sdi4-ffv1"
-	outname="${outpart}.mkv"
-	outfile="$STAGE3DIR/$outname"
-		ffmpeg -n \
-			-hide_banner \
-			-v warning \
-			-stats \
-			-i "$infile" \
-			-an -sn \
-			-vf "fieldmatch,bwdif=mode=send_field:deint=interlaced" \
-			-r "$MAXFPS" \
-			-c:v ffv1 "$outfile"
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function sdi4."
-}
-
-function softtelecine {
-	[ $DEBUG = 0 ] || echo "DEBUG: Entering function softtelecine."
-	local infile="$1"
-	bestdiff=100
-	tryalt=0
-	filmframes=$((filmframes + inframes))
-	if [ "$stage" -eq 1 ]; then
-		methodlist=(sdtc1 sdtc2 sdtc3 sdtc4 sdtc5)
-	else
-		methodlist=(sdtc0 sdtc1 sdtc2 sdtc3 sdtc4 sdtc5 sdtc6)
-	fi
-	local submethod
-	for submethod in "${methodlist[@]}"; do
-		echo "Trying submethod $submethod..."
-		"$submethod" "$infile"
-		checkduration "$infile" "$outfile"
-		if [ "$(echo "$pctdiff < $bestdiff" |bc -l)" -eq 1 ]; then
-			bestfile="$outfile"
-			bestdiff="$pctdiff"
-			bestcddurs="$outcddurs"
-			showdiff="$(printf "%.3f\n" "$rtdiff")"
-		fi
-		if [ "$stage" = 1 ] && [ "$(echo "$pctdiff <= $ALLOWLOSS" |bc -l)" -eq 1 ]; then
-			break
-		fi
-		if [ "$tryalt" = 1 ] && [ "$submethod" != "sdtc6" ]; then
-			echo "Submethod $submethod produced a bad duration."
-		elif [ "$tryalt" = 1 ]; then
-			echo "No method produced a good duration.  Using the best bad result: $bestcddurs vs. $incddurs"
-			echo -n ",$submethod" >>"$reportfile"
-		else
-			echo "Submethod $submethod produced a good duration: $bestcddurs vs. $incddurs"
-			echo -n ",$submethod" >>"$reportfile"
-			break
-		fi
-	done
-	if [ "$(echo "$bestdiff > 0" |bc -l)" -eq 1 ]; then
-		rename="$(echo "$bestfile" |cut -d. -f1)"
-		refile="${rename}-dt${showdiff}.mkv"
-		mv "$bestfile" "$refile"
-		bestfile="$refile"
-	fi
-	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function softtelecine."
 }
 
 function makerootfile {
@@ -1586,7 +1914,7 @@ function runsegments {
 	if [ "$mkvcount" -ne 0 ]; then
 		filmframes=0
 		vidframes=0
-		echo;echo "Running stage 3 (processing segments)."; echo
+		echo;echo "Running stage 3 (processing segments)..."
 		local segfile
 		segline=0
 		for segfile in *segment*.mkv; do
@@ -1605,7 +1933,6 @@ function runsegments {
 				fi
 				"$runmethod" "$segfile"
 				echo "file '$bestfile'" >>"$STAGE3DIR/concat.txt"
-				echo >>"$reportfile"
 			fi
 		done
 	else
@@ -1621,6 +1948,7 @@ function finalize {
 	local bestfile="$2"
 	[ $DEBUG = 0 ] || echo "DEBUG: Variable bestfile is $bestfile."
 	cd "$STAGE3DIR" ||exit 1
+	echo;echo "Running stage 4 (Finalizing and rejoining tracks)..."
 	if [ -f concat.txt ]; then
 		if [ "$FROUTS" == "OFF" ] && [ "$OUTPUTJOIN" == "1" ] && [ "$segfail" != 1 ]; then
 			inname="$(echo "$infile" |cut -d. -f1)"
@@ -1660,10 +1988,14 @@ function finalize {
 			set +m
 			[ $DEBUG = 0 ] || set +x
 			checkduration "$rundir/$orgfile" "$finfile"
+			echo "Finalized time difference: In: $incddurs Out: $outcddurs." |tee -a "$reportfile"
 			if [ "$MERGEMKV" == "1" ] && [ "$standard" != "PAL" ]; then
+				if [ "$MATCHTRACKS" -eq 1 ]; then
+					matchtracks "$orgfile" "$finfile"
+				fi
 				mergeinout "$rundir/$orgfile" "$finfile"
 			fi
-			[[ -v SUDO_USER ]] && chown "$SUDO_USER" "$outfile"
+			[[ -v SUDO_USER ]] && chown "$SUDO_USER" "$finfile"
 		elif [ "$FROUTS" != "OFF" ] && [ "$OUTPUTJOIN" == "1" ] && [ "$segfail" != 1 ]; then
 			echo;echo "Outputting at multiple frame rates..."
 			for frate in "${FROUTS[@]}"; do
@@ -1694,23 +2026,35 @@ function finalize {
 					-r "$outfps" \
 					-c:v ffv1 "$finfile"
 				checkduration "$rundir/$orgfile" "$finfile"
+				echo "Finalized time difference: In: $incddurs Out: $outcddurs." |tee -a "$reportfile"
 				if [ "$MERGEMKV" == "1" ] && [ "$standard" != "PAL" ]; then
+					if [ "$MATCHTRACKS" -eq 1 ]; then
+						matchtracks "$orgfile" "$finfile"
+					fi
 					mergeinout "$rundir/$orgfile" "$finfile"
 				fi
-				[[ -v SUDO_USER ]] && chown "$SUDO_USER" "$outfile"
+				[[ -v SUDO_USER ]] && chown "$SUDO_USER" "$finfile"
 			done
 		else
 			echo "ERROR: Unexpected concatenation failure."
 		fi
+		echo >>"$reportfile"
 	else
 		inname="$(basename "$bestfile" |cut -d. -f1)"
 		[ $DEBUG = 0 ] || echo "DEBUG: Variable inname is $inname."
-		outname="${inname}-final.mkv"
+		finname="${inname}-final.mkv"
 		[ $DEBUG = 0 ] || echo "DEBUG: Variable outname is $outname."
-		outfile="$OUTDIR/$outname"
+		finfile="$OUTDIR/$finname"
 		[ $DEBUG = 0 ] || echo "DEBUG: Variable outfile is $outfile."
-		echo;echo "Moving output file to $outfile..."
-		mv "$bestfile" "$outfile"
+		echo;echo "Moving output file to $finfile..."
+		mv "$bestfile" "$finfile"
+		checkduration "$rundir/$orgfile" "$finfile"
+		if [ "$MERGEMKV" == "1" ] && [ "$standard" != "PAL" ]; then
+			if [ "$MATCHTRACKS" -eq 1 ]; then
+				matchtracks "$orgfile" "$finfile"
+			fi
+			mergeinout "$rundir/$orgfile" "$finfile"
+		fi
 		[[ -v SUDO_USER ]] && chown "$SUDO_USER" "$outfile"
 	fi
 
@@ -1935,6 +2279,46 @@ function prepsegments {
 	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function prepsegments."
 }
 
+function matchtracks {
+	[ $DEBUG = 0 ] || echo "DEBUG: Entering function mmatchtracks."
+	local infile="$1"
+	outbase=$(basename "$finfile")
+	outname="$(echo "$outbase" |cut -d. -f1)"
+	amod=$(echo "$incddurs" / "$outcddurs" |bc -l)
+	smod=$(echo "$outcddurs" / "$incddurs" |bc -l)
+	acount=0
+	echo "Adjusing audio tracks..."
+	for atrack in $(ffprobe "$rundir/$infile" -v warning -show_entries stream=index -select_streams a -of compact=p=0:nk=1); do
+		codec=$(ffprobe "$rundir/$infile" -v error -select_streams a:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1)
+		outfile="$STAGE4DIR/$outname-aud${atrack}-adjusted.mkv"
+		ffmpeg -n -nostdin \
+			-hide_banner \
+			-v warning \
+			-stats \
+			-i "$rundir/$infile" \
+			-af "atempo=$amod" \
+			-acodec "$codec" \
+			-map 0:a:"$acount" \
+			"$outfile"
+		acount=$((acount + 1))
+	done
+	scount=0
+	echo "Adjusting subtitle tracks..."
+	for strack in $(ffprobe "$rundir/$infile" -v warning -show_entries stream=index -select_streams s -of compact=p=0:nk=1); do
+		outfile="$STAGE4DIR/$outname-sub${strack}-adjusted.mkv"
+		ffmpeg -n -nostdin \
+			-hide_banner \
+			-v warning \
+			-stats \
+			-itsscale "$smod" \
+			-i "$rundir/$infile" \
+			-map 0:s:"$scount" \
+			-c:s copy "$outfile"
+		scount=$((scount + 1))
+	done
+	[ $DEBUG = 0 ] || echo "DEBUG: Leaving function mmatchtracks."
+}
+
 function mergeinout {
 	[ $DEBUG = 0 ] || echo "DEBUG: Entering function mergeinout."
 	local infile="$1"
@@ -1943,8 +2327,14 @@ function mergeinout {
 	mergename="${outname}-merged.mkv"
 	mergefile="$mergename"
 	if [ -f "$outfile" ] && [ -f "$infile" ] &&  [ "$segfail" != 1 ]  && [ "$dryrun" != 1 ]; then
-		echo "Merging with original file..." |tee -a "$logfile"
-		mkvmerge -o "$mergefile" --track-name 0:"DRP Output" "$outfile" "$infile"
+		if [ "$MATCHTRACKS" -eq 1 ]; then
+			echo "Merging in adjusted audio and subtitle tracks..." |tee -a "$logfile"
+			cd "$STAGE4DIR" || exit 1
+			ln -s "$outfile" .
+			mkvmerge -o "$mergefile" ./*.mkv
+		else
+			mkvmerge -o "$mergefile" --track-name 0:"DRP Output" "$outfile" "$infile"
+		fi
 	else
 		echo "ERROR: Conditions for merge were not met."
 		exit 1
