@@ -1,12 +1,24 @@
 # DVD Rip Prep
 
-DVD Rip Prep (drp) is a bash script that attempts to prepare a MakeMKV DVD rip for upscaling.  It might also work with rips made with other software, but I have only tested MakeMKV rips.  It will probably not be of any use with other video files.  It only accepts NTSC or PAL SD video and that video ideally should not have been edited or reencoded since being ripped from DVD.  It is possible that it will work with other SD sources like digitized VHS or Laserdisc video, but I don't have any to try.
+DVD Rip Prep (drp) is a bash script that attempts to prepare a MakeMKV DVD rip for reecoding or upscaling.  It might also work with rips made with other software, but I have only tested MakeMKV rips.  It will probably not be of any use with other video files.  It only accepts NTSC or PAL SD video and that video ideally should not have been edited or reencoded since being ripped from DVD.  It is possible that it will work with other SD sources like digitized VHS or Laserdisc video, but I don't have any to try.
 
 Before you read further, this is a hobby project that I made for my own needs.  I am not a video professional and this is as much a learning project for me as anything.  I don't really know what I am doing.  The script is just built around ffmpeg and I am probably not even making full use of its capabilities.  So, keep your expectations minimal and perhaps you will be pleasantly surprised.
 
-There are other well established tools for doing this kind of work, but they weren't a good solution for me because they run on Windows and generally work best with rips that were not made by MakeMKV.  I run Linux and I have thousands of MakeMKV rips and I really didn't want to start over.  I also wanted a tool that was automatic, as much as possible.  There is no question that I could get better results doing everything manually, but I only have so much time to spend.  My goal was to get a good result, but not necessarily the best possible result, with the lowest possible amount of effort per video.
+There are other well established tools for doing this kind of work, but they weren't a good solution for me because they run on Windows and generally work best with rips that were not made by MakeMKV.  I run Linux and I have thousands of MakeMKV rips and I really didn't want to start over.  I also wanted a tool that was automatic, as much as possible.  There is no question that I could get better results by doing everything manually, but I only have so much time to spend.  My goal was to get a good result, but not necessarily the best possible result, with the lowest possible amount of effort per video.
 
 ## Updates
+
+### Mar 20, 2025
+
+The script can now convert padded PAL to NTSC converted video (25FPS padded to 30FPS by duplicating every fifth frame) back to either 24FPS, if PAL conversion is enabled, or 25FPS if disabled.
+
+There have been some minor bug fixes and refinements to some of the methods which should help to reduce the possibility of stutters in the output, particularly with hard telecine.
+
+### Feb 12, 2025
+
+The script will now adust any audio and subtitle tracks in the source video to match the output duration.  Usually, the difference amounts to tenths of a second at most and this makes no noticeable difference, but there is the occasional video that comes out with a duration that differs by half a second or more, even when every segment has matching input and output durations.  I have not been able to figure out why this happens, so I finally took the easiest path and just adjusted the other tracks to match.  This is not an ideal solution, since it means that the audio must be reencoded, but it is the only solution that I have come up with so far.  Of course, if your videos are the typical close match, you can just merge over the original audio tracks instead.  There is a new setting, MATCHTRACKS, that can be used to disable this feature.
+
+PAL conversion has also been improved.  All audio and subtitle tracks are new adjusted to the new frame rate.
 
 ### Jan 26, 2025
 
@@ -23,12 +35,6 @@ The format of the segment map file has changed.  It now contains frame numbers i
 The default size of the memory filesystem has changed to 16GB because it was running out of space in some cases.  This is now a max size rather than absolute.  If the file that you are processing is smaller, the script will only use as much space as necessary.
 
 Now that I have something that works pretty well, the next big step might be to port it to a more capable language, like Python.  I have never written anything in Python, but I'll probably give it a shot.
-
-### Feb 12, 2025
-
-The script will now adust any audio and subtitle tracks in the source video to match the output duration.  Usually, the difference amounts to tenths of a second at most and this makes no noticeable difference, but there is the occasional video that comes out with a duration that differs by half a second or more, even when every segment has matching input and output durations.  I have not been able to figure out why this happens, so I finally took the easiest path and just adjusted the other tracks to match.  This is not an ideal solution, since it means that the audio must be reencoded, but it is the only solution that I have come up with so far.  Of course, if your videos are the typical close match, you can just merge over the original audio tracks instead.  There is a new setting, MATCHTRACKS, that can be used to disable this feature.
-
-PAL conversion has also been improved.  All audio and subtitle tracks are new adjusted to the new frame rate.
 
 ## Background
 
@@ -91,6 +97,7 @@ The script is best at converting single method videos.  It can do the following 
 * 30FPS improperly deinterlaced hard telecined video to 24FPS progressive video  
 * 30FPS interlaced video to 30 or 60FPS progressive video  
 * 25FPS PAL (interlaced or progressive) to 24 or 48FPS progressive video  
+* 30FPS padded PAL->NTSC conversion to either to the original 25FPS or to 24 FPS
 
 These conversions should give you a file with a consistent frame rate, and no introduced stutters, that can be processed in TVAI without resorting to an interlaced method.  It is worth noting again that the aim of this script is not perfection.  Except for soft telecined and progressive content, it will probably never produce a result that does not contain a single interlaced frame.  They are going to continue to lurk in the transitions and in sequences of fast motion where ffmpeg cannot find a good match, but the occasional interlaced frame is usually going to go unnoticed in casual viewing and it is not worth the extra effort that would be required to eliminate them.
 
@@ -106,11 +113,13 @@ By default, the final output of the script will be both a "rejoined" MKV that co
 
 As far as I can tell, any content that you find on a PAL format DVD that was originally shot on film is just sped up from 24 to 25 FPS.  Drp will convert this by slowing the video back down to 24 FPS.  It will also adjust all audio and subtitle tracks to match the new duration.  If you don't want PAL conversion, set CONVPAL to 0 in the drp script.
 
-Converted interlaced PAL video will be output at two frame rates: 24FPS and 48FPS.  This is because there is no easy way to determine whether the source was originally produced on video with different interlaced fields or if it was filmed and the interlaced fields produced by splitting frames.  In general, material that was shot on film will look best at 24FPS and material that was shot on video will look best at 48FPS.  You should keep the frame rate that looks best to you.
+Interlaced PAL video will be output at two frame rates: 24FPS and 48FPS.  This is because there is no easy way to determine whether the source was originally produced on video with different interlaced fields or if it was filmed and the interlaced fields produced by splitting frames.  In general, material that was shot on film will look best at 24FPS and material that was shot on video will look best at 48FPS.  You should keep the frame rate that looks best to you.
+
+The script can also undo bad PAL conversion, in which duplicate frames were added to convert 25FPS to 30FPS.  If PAL conversion is disabled, the script will convert such videos back to 25FPS, eliminating the duplicated frames.  If PAL conversion is enabled, it will then take the second step of stretching the 25FPS out to 24FPS, which is the rate that the original source was filmed at in most cases.
 
 ## Installation
 
-The script requires a system that runs a bash shell (Linux/Unix/Mac or Windows with the Linux subsystem) and ffmpeg, ffprobe, and mkvtoolnix must be installed.  I have only tested it on Ubuntu Linux, so there might well be minor compatibility problems with other distros or systems.  I will do my best to fix problems that crop up on other platforms, but my experience with them is limited.  This could probably be ported to run natively on Windows without too much trouble, since the tools that it uses are all available in Windows native versions, but I haven't run Windows in 20 years, so I am probably not the one to do it.
+The script requires a system that runs a bash shell (Linux/Unix/Mac or Windows with the Linux subsystem) and ffmpeg, ffprobe, mediainfo, and mkvtoolnix must be installed.  I have only tested it on Ubuntu Linux, so there might well be minor compatibility problems with other distros or systems.  I will do my best to fix problems that crop up on other platforms, but my experience with them is limited.  This could probably be ported to run natively on Windows without too much trouble, since the tools that it uses are all available in Windows native versions, but I haven't run Windows in 20 years, so I am probably not the one to do it.
 
 The two scripts, drp and smap, are just bash scripts and can be installed anywhere that is convenient.  You might just keep them in your home directory.  If you want them to be in path, then the /usr/local/bin directory wouldn't be a bad place to put them.
 
@@ -163,7 +172,7 @@ These are primarily for my use, but you might find them helpful for troubleshoot
 
 #### FROUTS
 
-Most of the time, when using the mixed method, the script will output at either 60 or 120FPS.  You might want to try other frame rates.  For example, if a video is mostly 24FPS but has some higher frame rate material at the beginning or end, you might want to try it at 24FPS.  You can set FROUTS to a space delimited list of rates that you want to be output.  For example, if you want to try every major frame rate, use FROUTS=(24 30 48 60 120).  The default is (24 30 60 120), as 48 is only useful in relatively rare cases.  You can also set this to OFF and the script will output only the frame rate that is the lowest common denominator.
+Most of the time, when using the mixed method, the script will output at either 60 or 120FPS.  You might want to try other frame rates.  For example, if a video is mostly 24FPS but has some higher frame rate material at the beginning or end, you might want to try it at 24FPS.  You can set FROUTS to a space delimited list of rates that you want to be output.  For example, if you want to try every major frame rate, use FROUTS=(24 30 48 60 120).  The default is (24 30 60 120), as 48 is only useful in relatively rare cases.  This is an array, so you must include the parentheses.  You can also set this to OFF (default) and the script will output only the frame rate that is the lowest common denominator.
 
 #### HTCTHRESH
 
@@ -209,7 +218,7 @@ RATELOCK determines how far the frame rate can diverge from the nominal rate and
 
 #### STRICT
 
-STRICT mode will send all videos that match 30FPS, even within the RATELOCK allowance, through the mixed method.  The script cannot reliably determine whether a 30FPS video consists of a mix of telecined and interlaced content without running it through the mapper.  If you want to make sure that interlaced and hard telecined segments get processed separately, leave this enabled (1), which is the default.  If you want faster processing and aren't particular, disable it.  Most of the time, the script will appropriately process mixed interlaced and telecined content, but when it gets really chopped up and there is a mixture of TFF and BFF material, it is better to separate segments.  The only downside to STRICT is that the script is much slower.
+STRICT mode will send all videos that match 30FPS, even within the RATELOCK allowance, through the mixed method.  The script cannot reliably determine whether a 30FPS video consists of a mix of telecined and interlaced content without running it through the mapper.  If you want to make sure that interlaced and hard telecined segments get processed separately, leave this enabled (1), which is the default.  If you want faster processing and aren't particular, disable it.  Most of the time, the script will appropriately process mixed interlaced and telecined content, but when it gets really chopped up and there is a mixture of TFF and BFF material, it is better to separate segments.  The only downside to STRICT is that each video takes much longer to process.  Strict mode can also be enabled with the -s flag.
 
 #### WRITELOGS
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# smap (Segment Mapper) bash script - Feb. 12 2025
+# smap (Segment Mapper) bash script - Mar. 20 2025
 #
 # This script attempts to analyze an MKV file produced by MakeMKV from a DVD 
 # source and find where the original frame rates and interlacing methods change
@@ -459,6 +459,12 @@ function gettrans {
 			elif [ "$prevtype2" == "BDTC" ] && [ "$curtype" == "BDTC" ] && [ "$prevtype1" == "INT" ]; then
 				:
 			elif [ "$prevtype2" == "BDTC" ] && [ "$curtype" == "BDTC" ] && [ "$prevtype1" == "HTC" ]; then
+				:
+			elif [ "$curtype" == "TRN" ] && [ "$prevtype1" == "TRN" ]; then
+				:
+			elif [ "$prevtype2" == "$curtype" ] && [ "$prevtype1" == "TRN" ]; then
+				:
+			elif [ "$prevtype2" == "$curtype" ] && [ "$prevtype1" == "BDTC" ]; then
 				:
 			elif [ "$firstline" = 1 ]; then
 				:
